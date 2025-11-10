@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build --workspace=@hola-tattoo/bot-engine",
+  "buildCommand": "npm run build --workspace=@hola-tattoo/shared-types && npm run build --workspace=@hola-tattoo/database && npm run build --workspace=@hola-tattoo/bot-engine",
   "outputDirectory": "apps/bot-engine/dist",
   "installCommand": "npm install",
   "framework": null
