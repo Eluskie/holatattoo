@@ -1,7 +1,6 @@
 {
-  "buildCommand": "cd apps/bot-engine && npm run build",
+  "buildCommand": "npm run build --workspace=apps/bot-engine",
   "outputDirectory": "apps/bot-engine/dist",
   "installCommand": "npm install",
-  "devCommand": "cd apps/bot-engine && npm run dev",
   "framework": null
 }
