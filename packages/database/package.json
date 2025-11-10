@@ -11,7 +11,8 @@
     "studio": "prisma studio",
     "generate": "prisma generate",
     "push": "prisma db push",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^5.7.1"
