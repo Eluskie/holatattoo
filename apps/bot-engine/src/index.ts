@@ -25,7 +25,13 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Bot Engine running on port ${PORT}`);
-  console.log(`📱 Twilio webhook: http://localhost:${PORT}/webhook/twilio/whatsapp`);
-});
+// Only start server if not in serverless environment
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`🚀 Bot Engine running on port ${PORT}`);
+    console.log(`📱 Twilio webhook: http://localhost:${PORT}/webhook/twilio/whatsapp`);
+  });
+}
+
+// Export for Vercel serverless
+export default app;
