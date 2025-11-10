@@ -1,12 +1,10 @@
 {
   "version": 2,
+  "buildCommand": "npm run build --workspace=@hola-tattoo/shared-types && npm run build --workspace=@hola-tattoo/database",
   "builds": [
     {
       "src": "apps/bot-engine/src/index.ts",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": ["packages/**/*"]
-      }
+      "use": "@vercel/node"
     }
   ],
   "routes": [
