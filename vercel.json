@@ -3,6 +3,5 @@
   "outputDirectory": "apps/bot-engine/dist",
   "installCommand": "npm install",
   "devCommand": "cd apps/bot-engine && npm run dev",
-  "framework": null,
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD apps/bot-engine packages/database packages/shared-types"
+  "framework": null
 }
