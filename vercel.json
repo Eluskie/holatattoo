@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build --workspace=apps/bot-engine",
+  "buildCommand": "npx prisma generate --schema=packages/database/prisma/schema.prisma && npm run build --workspace=@hola-tattoo/bot-engine",
   "outputDirectory": "apps/bot-engine/dist",
   "installCommand": "npm install",
   "framework": null
