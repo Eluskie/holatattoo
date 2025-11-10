@@ -15,6 +15,12 @@ export interface BotResponse {
  * Main handler for incoming WhatsApp messages
  */
 export async function handleIncomingMessage(message: TwilioIncomingMessage): Promise<BotResponse | null> {
+  // Validate required fields
+  if (!message.From || !message.To) {
+    console.error('❌ Missing From or To field in message:', message);
+    return null;
+  }
+
   // Extract phone number (remove 'whatsapp:' prefix)
   const userPhone = message.From.replace('whatsapp:', '');
   const studioPhone = message.To.replace('whatsapp:', '');
