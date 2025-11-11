@@ -11,6 +11,9 @@ COPY apps/dashboard/package.json ./apps/dashboard/
 COPY packages/database/package.json ./packages/database/
 COPY packages/shared-types/package.json ./packages/shared-types/
 
+# Copy Prisma schema (needed for postinstall script)
+COPY packages/database/prisma ./packages/database/prisma
+
 # Install dependencies
 RUN npm ci
 
