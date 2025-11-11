@@ -34,7 +34,7 @@ async function addMessageToConversation(
     return;
   }
 
-  const messages = (conversation.messages as ConversationMessage[]) || [];
+  const messages = (Array.isArray(conversation.messages) ? conversation.messages : []) as ConversationMessage[];
   messages.push({
     role,
     content,
@@ -46,7 +46,7 @@ async function addMessageToConversation(
 
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { messages }
+    data: { messages: messages as any }
   });
 
   console.log(`✅ [MESSAGES] Saved ${messages.length} messages to database`);
