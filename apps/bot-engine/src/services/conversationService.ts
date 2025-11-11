@@ -145,6 +145,16 @@ async function processConversationalMessage(
   // Get AI response
   const aiResponse = await getConversationalResponse(userMessage, context);
 
+  // Safety net: suppress redundant placement/size questions if placement already covered
+  const placementCovered =
+    Boolean(context.collectedData?.placement_size) ||
+    Boolean(context.collectedData?.placement_concept) ||
+    Boolean(context.collectedData?.description);
+  const placementPromptRegex = /(mida|ubicació|on\s+.*cos|placement_size)/i;
+  const filteredMessages = placementCovered
+    ? aiResponse.messages.filter(m => !placementPromptRegex.test(m))
+    : aiResponse.messages;
+
   // Update conversation with new data
   await prisma.conversation.update({
     where: { id: conversationId },
@@ -170,8 +180,8 @@ async function processConversationalMessage(
     return { messages: recapMessages, delay: 1000 };
   }
 
-  // Return AI's conversational response
-  return { messages: aiResponse.messages, delay: 800 };
+  // Return AI's conversational response (filtered if needed)
+  return { messages: filteredMessages, delay: 800 };
 }
 
 /**

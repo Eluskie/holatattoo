@@ -93,7 +93,7 @@ export async function getConversationalResponse(
       model: 'gpt-3.5-turbo',
       messages: messages,
       max_tokens: 200,
-      temperature: 0.7 // Higher temp for more natural conversation
+      temperature: 0.3 // Lower temp to reduce repetition/drift
     });
 
     const assistantResponse = completion.choices[0]?.message?.content?.trim() ||
@@ -135,12 +135,9 @@ export async function getConversationalResponse(
 
     console.log('🔍 [DEBUG] Updated data:', JSON.stringify(updatedData, null, 2));
 
-    // Check if we have all required fields for a basic estimate (avoid budget/tool booking)
-    const hasPlacement =
-      Boolean(updatedData.placement_size) ||
-      Boolean(updatedData.description) ||
-      Boolean(updatedData.placement_concept);
-    const isComplete = Boolean(updatedData.style) && Boolean(updatedData.color) && hasPlacement;
+    // Completion: ready to estimate when description AND (style OR color)
+    const hasStyleOrColor = Boolean(updatedData.style) || Boolean(updatedData.color);
+    const isComplete = Boolean(updatedData.description) && hasStyleOrColor;
 
     return {
       messages: messagesArray,

@@ -67,30 +67,27 @@ Return ONLY the extracted value or "UNCLEAR", nothing else.`;
  * Uses ChatGPT to determine if the user wants to quit/cancel the conversation
  */
 export async function detectExitIntent(userMessage: string): Promise<boolean> {
-  const prompt = `Analyze this WhatsApp message and determine if the user wants to quit, cancel, or stop the conversation.
+  const msg = (userMessage || '').toLowerCase().trim();
 
-User message: "${userMessage}"
-
-Return ONLY "true" if they want to quit/cancel/stop, or "false" if they want to continue.
-Examples of exit intent: "cancel", "stop", "no thanks", "not interested", "quit", "adiós", "no gracias"`;
-
-  try {
-    const completion = await getOpenAI().chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [{
-        role: 'user',
-        content: prompt
-      }],
-      max_tokens: 10,
-      temperature: 0.3
-    });
-
-    const response = completion.choices[0]?.message?.content?.trim().toLowerCase() || 'false';
-    return response === 'true';
-  } catch (error) {
-    console.error('Error detecting exit intent:', error);
+  // Phrases that indicate "finished/that's enough" should NOT be treated as exit
+  const completionPhrases = [
+    'ja està', 'ja esta', 'ja está', 'ja ho tens', 'ja val', 'prou', 'listo',
+    'done', 'envia', 'envia-ho', 'posteja', 'ok, gràcies', 'ok gracias', 'ok gracias', 'gràcies'
+  ];
+  if (completionPhrases.some(p => msg.includes(p))) {
     return false;
   }
+
+  // Explicit "not interested / cancel" phrases that DO indicate exit
+  const uninterestedPhrases = [
+    'no m’interessa', 'no m interessa', 'no minteressa', 'no me interesa',
+    'not interested', 'no interest', 'no interested',
+    'no vull seguir', 'passo', 'ho deixo', 'deixa-ho', 'deixa ho',
+    'cancel·la', 'cancela', 'cancel', 'stop', 'parar', 'para', 'basta',
+    'no gràcies', 'no gracias', 'no, gràcies', 'no, gracias',
+    'no vull', 'no em va bé i no vull'
+  ];
+  return uninterestedPhrases.some(p => msg.includes(p));
 }
 
 /**
