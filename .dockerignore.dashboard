@@ -1,0 +1,18 @@
+node_modules
+npm-debug.log
+.env
+.env.local
+.env*.local
+dist
+*.md
+.git
+.gitignore
+*.log
+.DS_Store
+
+# Exclude bot-engine (not needed for dashboard build)
+apps/bot-engine
+
+# Exclude widget (not needed for dashboard build)
+packages/widget
+
