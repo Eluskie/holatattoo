@@ -49,6 +49,9 @@ RUN cd apps/bot-engine && npm run build
 FROM base AS runner
 WORKDIR /app
 
+# Install curl for healthcheck
+RUN apt-get update -y && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 ENV NODE_ENV=production
 ENV PORT=3001
 
@@ -62,8 +65,8 @@ COPY --from=builder /app/apps/bot-engine/package.json ./package.json
 EXPOSE 3001
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
-  CMD node -e "require('http').get('http://localhost:3001/health', (r) => {if(r.statusCode !== 200) throw new Error('Health check failed')})"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:3001/health || exit 1
 
 # Start the application
 CMD ["node", "dist/index.js"]
