@@ -86,7 +86,7 @@ export async function detectExitIntent(userMessage: string): Promise<boolean> {
 
   // Explicit "not interested / cancel" phrases that DO indicate exit
   const uninterestedPhrases = [
-    'no m'interessa', 'no m interessa', 'no minteressa', 'no me interesa',
+    'no m\'interessa', 'no m interessa', 'no minteressa', 'no me interesa',
     'not interested', 'no interest', 'no interested',
     'no vull seguir', 'passo', 'ho deixo', 'deixa-ho', 'deixa ho',
     'cancel·la', 'cancela', 'cancel', 'stop', 'parar', 'para', 'basta',
