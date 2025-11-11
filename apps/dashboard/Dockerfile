@@ -1,0 +1,63 @@
+FROM node:18-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Copy workspace package files
+COPY package.json package-lock.json ./
+COPY apps/dashboard/package.json ./apps/dashboard/
+COPY packages/database/package.json ./packages/database/
+COPY packages/shared-types/package.json ./packages/shared-types/
+
+# Install dependencies
+RUN npm ci
+
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Generate Prisma Client
+RUN npx prisma generate --schema=./packages/database/prisma/schema.prisma
+
+# Build packages first
+WORKDIR /app/packages/database
+RUN npm run build
+
+WORKDIR /app/packages/shared-types
+RUN npm run build
+
+# Build dashboard
+WORKDIR /app/apps/dashboard
+RUN npm run build
+
+# Production image
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Copy necessary files
+COPY --from=builder /app/apps/dashboard/public ./apps/dashboard/public
+COPY --from=builder /app/apps/dashboard/.next/standalone ./
+COPY --from=builder /app/apps/dashboard/.next/static ./apps/dashboard/.next/static
+
+# Copy Prisma files
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+CMD ["node", "apps/dashboard/server.js"]
+

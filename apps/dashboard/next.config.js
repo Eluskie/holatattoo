@@ -1,9 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['@hola-tattoo/database', '@hola-tattoo/shared-types'],
-  experimental: {
-    serverComponentsExternalPackages: ['@prisma/client'],
-  },
+  serverExternalPackages: ['@prisma/client', '@hola-tattoo/database'],
+  output: 'standalone', // Required for Docker deployment
 }
 
 module.exports = nextConfig

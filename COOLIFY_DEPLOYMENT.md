@@ -52,7 +52,7 @@ JWT_SECRET=hola-tattoo-secret-key-2025
 
 ### 4. Configure Domain
 
-**Domain:** `bot.withflare.so` (or your preferred subdomain)
+**Domain:** `agent.withflare.so` (or your preferred subdomain)
 
 **Enable HTTPS:** Yes (Coolify auto-provisions Let's Encrypt)
 
@@ -61,7 +61,7 @@ JWT_SECRET=hola-tattoo-secret-key-2025
 1. Click **Deploy**
 2. Monitor build logs
 3. Wait for deployment to complete
-4. Check health endpoint: `https://bot.withflare.so/health`
+4. Check health endpoint: `https://agent.withflare.so/health`
 
 ### 6. Update Twilio Webhook
 
@@ -69,7 +69,7 @@ Once deployed, update Twilio webhook URL:
 
 1. Go to Twilio Console: https://console.twilio.com
 2. Navigate to **Messaging** → **Settings** → **WhatsApp Sandbox** (or your number)
-3. Update webhook URL to: `https://bot.withflare.so/webhook/twilio/whatsapp`
+3. Update webhook URL to: `https://agent.withflare.so/webhook/twilio/whatsapp`
 4. Method: **POST**
 5. Save
 
@@ -77,7 +77,7 @@ Once deployed, update Twilio webhook URL:
 
 Test the health endpoint:
 ```bash
-curl https://bot.withflare.so/health
+curl https://agent.withflare.so/health
 ```
 
 Expected response:
@@ -122,14 +122,14 @@ Coolify can auto-deploy on git push:
 ### WhatsApp Messages Not Received
 
 - Verify Twilio webhook URL is correct
-- Check bot is accessible: `curl https://bot.withflare.so/health`
+- Check bot is accessible: `curl https://agent.withflare.so/health`
 - Review bot logs in Coolify
 
 ### Database Connection Issues
 
 - Verify DATABASE_URL uses connection pooler
 - Check Supabase connection pooler is enabled
-- Test connection: `curl https://bot.withflare.so/health`
+- Test connection: `curl https://agent.withflare.so/health`
 
 ## Benefits of Coolify Deployment
 
@@ -142,7 +142,7 @@ Coolify can auto-deploy on git push:
 
 ## Monitoring
 
-**Health Check:** `https://bot.withflare.so/health`
+**Health Check:** `https://agent.withflare.so/health`
 
 **Logs:** Available in Coolify dashboard under your application
 

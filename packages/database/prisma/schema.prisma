@@ -10,10 +10,26 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// User model - synced with Supabase Auth
+model User {
+  id        String   @id // Supabase Auth UUID
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  studios   Studio[]
+
+  @@map("users")
+}
+
 model Studio {
   id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   name           String
-  email          String   @unique
+  email          String
   whatsappNumber String?  @map("whatsapp_number")
   webhookUrl     String?  @map("webhook_url")
   createdAt      DateTime @default(now()) @map("created_at")
@@ -22,6 +38,7 @@ model Studio {
   botConfig      BotConfig?
   conversations  Conversation[]
 
+  @@index([userId])
   @@map("studios")
 }
 

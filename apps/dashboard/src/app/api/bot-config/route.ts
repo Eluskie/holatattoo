@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@hola-tattoo/database'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET() {
   try {
-    // Get the first studio (no auth for now)
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    }
+
     const studio = await prisma.studio.findFirst({
-      include: { botConfig: true }
+      where: { userId: user.id },
+      include: { botConfig: true },
     })
 
     if (!studio) {
@@ -21,8 +31,18 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    // Get the first studio (no auth for now)
-    const studio = await prisma.studio.findFirst()
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const studio = await prisma.studio.findFirst({
+      where: { userId: user.id },
+    })
 
     if (!studio) {
       return NextResponse.json({ success: false, error: 'Studio not found' }, { status: 404 })
@@ -36,8 +56,8 @@ export async function POST(request: NextRequest) {
         studioId: studio.id,
         welcomeMessage,
         brandingColor,
-        questions
-      }
+        questions,
+      },
     })
 
     return NextResponse.json({ success: true, data: botConfig })
@@ -49,9 +69,18 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    // Get the first studio (no auth for now)
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    }
+
     const studio = await prisma.studio.findFirst({
-      include: { botConfig: true }
+      where: { userId: user.id },
+      include: { botConfig: true },
     })
 
     if (!studio || !studio.botConfig) {
@@ -66,8 +95,8 @@ export async function PUT(request: NextRequest) {
       data: {
         welcomeMessage,
         brandingColor,
-        questions
-      }
+        questions,
+      },
     })
 
     return NextResponse.json({ success: true, data: botConfig })

@@ -1,20 +1,38 @@
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // If user is logged in, redirect to dashboard
+  if (user) {
+    redirect('/dashboard')
+  }
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-white to-gray-50">
       <nav className="border-b bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-primary-600">Hola Tattoo</h1>
+              <h1 className="text-2xl font-bold text-blue-600">Hola Tattoo</h1>
             </div>
             <div className="flex items-center gap-4">
               <Link
-                href="/dashboard"
-                className="bg-primary-600 text-white hover:bg-primary-700 px-4 py-2 rounded-md text-sm font-medium"
+                href="/auth/login"
+                className="text-gray-700 hover:text-gray-900 px-4 py-2 rounded-md text-sm font-medium"
               >
-                Dashboard
+                Sign In
+              </Link>
+              <Link
+                href="/auth/signup"
+                className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-md text-sm font-medium"
+              >
+                Get Started
               </Link>
             </div>
           </div>
@@ -26,7 +44,7 @@ export default function Home() {
           <h1 className="text-5xl font-bold text-gray-900 mb-6">
             WhatsApp Lead Qualification
             <br />
-            <span className="text-primary-600">For Your Tattoo Studio</span>
+            <span className="text-blue-600">For Your Tattoo Studio</span>
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             Automate your lead qualification with an AI-powered WhatsApp bot.
@@ -34,10 +52,10 @@ export default function Home() {
           </p>
           <div className="flex gap-4 justify-center">
             <Link
-              href="/dashboard"
-              className="bg-primary-600 text-white hover:bg-primary-700 px-8 py-3 rounded-lg text-lg font-medium"
+              href="/auth/signup"
+              className="bg-blue-600 text-white hover:bg-blue-700 px-8 py-3 rounded-lg text-lg font-medium"
             >
-              Go to Dashboard
+              Get Started Free
             </Link>
             <Link
               href="#features"

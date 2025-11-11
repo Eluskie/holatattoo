@@ -1,40 +1,81 @@
 import { prisma } from '@hola-tattoo/database'
 import { ConversationsTable } from '@/components/ConversationsTable'
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import Link from 'next/link'
 
 export default async function DashboardPage() {
-  // Get the first studio (no auth for now)
-  let studio = await prisma.studio.findFirst({
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/auth/login')
+  }
+
+  // Ensure user exists in our database
+  let dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+  })
+
+  if (!dbUser) {
+    // Create user if they don't exist (shouldn't happen normally, but good fallback)
+    dbUser = await prisma.user.create({
+      data: {
+        id: user.id,
+        email: user.email!,
+        name: user.user_metadata?.name || null,
+      },
+    })
+  }
+
+  // Get user's first studio
+  const studio = await prisma.studio.findFirst({
+    where: { userId: user.id },
     include: {
       botConfig: true,
       conversations: {
         orderBy: { createdAt: 'desc' },
-        take: 10
-      }
-    }
+        take: 10,
+      },
+    },
   })
 
-  // If no studio exists, show empty state
+  // If no studio exists, show onboarding
   if (!studio) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900">No Studio Found</h1>
-          <p className="text-gray-600 mt-2">Please create a studio first.</p>
+        <div className="text-center py-12">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+            Welcome to Hola Tattoo! 👋
+          </h1>
+          <p className="text-gray-600 mb-8 max-w-2xl mx-auto">
+            You haven't set up your WhatsApp bot yet. Let's create your first studio
+            and configure your bot to start capturing leads.
+          </p>
+          <Link
+            href="/onboarding"
+            className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+          >
+            Get Started
+          </Link>
         </div>
       </div>
     )
   }
 
+  // Get stats for user's studio
   const stats = {
     total: await prisma.conversation.count({ where: { studioId: studio.id } }),
     qualified: await prisma.conversation.count({
-      where: { studioId: studio.id, status: 'qualified' }
+      where: { studioId: studio.id, status: 'qualified' },
     }),
     active: await prisma.conversation.count({
-      where: { studioId: studio.id, status: 'active' }
+      where: { studioId: studio.id, status: 'active' },
     }),
     dropped: await prisma.conversation.count({
-      where: { studioId: studio.id, status: 'dropped' }
+      where: { studioId: studio.id, status: 'dropped' },
     }),
   }
 
