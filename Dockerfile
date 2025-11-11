@@ -34,6 +34,10 @@ COPY packages ./packages
 # Generate Prisma Client
 RUN cd packages/database && npx prisma generate
 
+# Build workspace packages in dependency order
+RUN cd packages/shared-types && npm run build
+RUN cd packages/database && npm run build
+
 # Build bot-engine
 RUN cd apps/bot-engine && npm run build
 
