@@ -13,7 +13,10 @@ COPY apps/bot-engine/package.json ./apps/bot-engine/
 COPY packages/database/package.json ./packages/database/
 COPY packages/shared-types/package.json ./packages/shared-types/
 
-# Install all dependencies
+# Copy Prisma schema BEFORE npm ci (needed for postinstall hook)
+COPY packages/database/prisma ./packages/database/prisma
+
+# Install all dependencies (Prisma postinstall will generate client)
 RUN npm ci
 
 # Build stage
