@@ -293,8 +293,8 @@ async function buildConfirmationRecap(data: Record<string, any>): Promise<string
   if (data.style) summaryParts.push(`Estil: ${data.style}`);
   if (data.placement_size) summaryParts.push(`Ubicació: ${data.placement_size}`);
   if (data.color) summaryParts.push(`Color: ${data.color}`);
-  if (data.budget) summaryParts.push(`Pressupost: ${data.budget}`);
-  if (data.timing) summaryParts.push(`Timing: ${data.timing}`);
+  if (data.description) summaryParts.push(`Descripció: ${data.description}`);
+  if (data.timing_preference) summaryParts.push(`Timing (tentatiu): ${data.timing_preference}`);
   if (data.name) summaryParts.push(`Nom: ${data.name}`);
 
   // Add summary as separate message
@@ -327,8 +327,8 @@ async function buildFinalRecap(
   if (data.style) summaryParts.push(`Estil: ${data.style}`);
   if (data.placement_size) summaryParts.push(`Ubicació: ${data.placement_size}`);
   if (data.color) summaryParts.push(`Color: ${data.color}`);
-  if (data.budget) summaryParts.push(`Pressupost: ${data.budget}`);
-  if (data.timing) summaryParts.push(`Timing: ${data.timing}`);
+  if (data.description) summaryParts.push(`Descripció: ${data.description}`);
+  if (data.timing_preference) summaryParts.push(`Timing (tentatiu): ${data.timing_preference}`);
 
   // Add summary as separate message
   if (summaryParts.length > 0) {
@@ -342,7 +342,7 @@ async function buildFinalRecap(
   }
 
   // Final message with emoji (positive sentiment!)
-  messages.push(`He passat la info a l'estudi.`);
+  messages.push(`Passo la informació a l'estudi.`);
   messages.push(`Et contactaran aviat, ${data.name || 'gràcies'}! 😊`);
 
   // Send lead to webhook

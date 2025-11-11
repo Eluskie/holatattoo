@@ -8,11 +8,13 @@ async function main() {
   // Create a test studio
   const studio = await prisma.studio.upsert({
     where: { email: 'test@holatattoostudio.com' },
-    update: {},
+    update: {
+      whatsappNumber: 'whatsapp:+14155238886', // Twilio WhatsApp Sandbox
+    },
     create: {
       name: 'Hola Tattoo Studio',
       email: 'test@holatattoostudio.com',
-      whatsappNumber: 'whatsapp:+14155238886', // Twilio sandbox number
+      whatsappNumber: 'whatsapp:+14155238886', // Twilio WhatsApp Sandbox
       webhookUrl: 'https://webhook.site/your-unique-url', // Replace with your test webhook
     }
   });
@@ -42,30 +44,28 @@ async function main() {
         },
         {
           id: 3,
+          text: "Vols descriure-ho una mica? Si és gran o envolta zones, m'ajuda.",
+          field: 'description',
+          type: 'text'
+        },
+        {
+          id: 4,
           text: "On al cos, i quina mida? S fins 5cm, M 5-12cm, L 12-20cm, XL secció completa (mitja màniga)",
           field: 'placement_size',
           type: 'text'
         },
         {
-          id: 4,
+          id: 5,
           text: "Prefereixes color o blanc i negre?",
           field: 'color',
           type: 'choice',
           choices: ['Color', 'Blanc i negre', 'No estic segur']
         },
         {
-          id: 5,
-          text: "Quin pressupost tens en ment: menys de 150€, 150-300€, o més de 300€?",
-          field: 'budget',
-          type: 'choice',
-          choices: ['Menys de 150€', '150-300€', 'Més de 300€']
-        },
-        {
           id: 6,
-          text: "Vols reservar en les pròximes 2-4 setmanes, o més endavant?",
-          field: 'timing',
-          type: 'choice',
-          choices: ['2-4 setmanes', 'Més endavant', 'Urgent (demà/aquesta setmana)']
+          text: "Quan t’aniria bé de forma general? (ex: aquesta setmana, dimarts, aviat)",
+          field: 'timing_preference',
+          type: 'text'
         },
         {
           id: 7,
@@ -102,30 +102,28 @@ async function main() {
         },
         {
           id: 3,
+          text: "Vols descriure-ho una mica? Si és gran o envolta zones, m'ajuda.",
+          field: 'description',
+          type: 'text'
+        },
+        {
+          id: 4,
           text: "On al cos, i quina mida? S fins 5cm, M 5-12cm, L 12-20cm, XL secció completa (mitja màniga)",
           field: 'placement_size',
           type: 'text'
         },
         {
-          id: 4,
+          id: 5,
           text: "Prefereixes color o blanc i negre?",
           field: 'color',
           type: 'choice',
           choices: ['Color', 'Blanc i negre', 'No estic segur']
         },
         {
-          id: 5,
-          text: "Quin pressupost tens en ment: menys de 150€, 150-300€, o més de 300€?",
-          field: 'budget',
-          type: 'choice',
-          choices: ['Menys de 150€', '150-300€', 'Més de 300€']
-        },
-        {
           id: 6,
-          text: "Vols reservar en les pròximes 2-4 setmanes, o més endavant?",
-          field: 'timing',
-          type: 'choice',
-          choices: ['2-4 setmanes', 'Més endavant', 'Urgent (demà/aquesta setmana)']
+          text: "Quan t’aniria bé de forma general? (ex: aquesta setmana, dimarts, aviat)",
+          field: 'timing_preference',
+          type: 'text'
         },
         {
           id: 7,

@@ -28,24 +28,22 @@ const EXTRACT_TATTOO_INFO_FUNCTION = {
         enum: ['Tradicional', 'Realisme', 'Línia fina', 'Neo-tradicional', 'Abstracte', 'No estic segur'],
         description: 'Tattoo style - only if user explicitly mentions it'
       },
+      description: {
+        type: 'string',
+        description: 'Detailed description of the tattoo idea, placement, complexity, or any specific details the user provides. Capture the full context and details, especially for complex or multi-area tattoos.'
+      },
       placement_size: {
         type: 'string',
-        description: 'Location and size (e.g., "avantbraç M", "esquena L"). Format: location + size (S/M/L/XL). Only if user explicitly mentions it.'
+        description: 'Simple placement and approximate size for price estimation (e.g., "avantbraç M", "esquena L"). Format: location + size (S/M/L/XL). Only needed for basic price estimation.'
       },
       color: {
         type: 'string',
         enum: ['Color', 'Blanc i negre', 'No estic segur'],
         description: 'Color preference - only if user explicitly mentions it'
       },
-      budget: {
+      timing_preference: {
         type: 'string',
-        enum: ['Menys de 150€', '150-300€', 'Més de 300€'],
-        description: 'Budget range - only if user explicitly mentions it'
-      },
-      timing: {
-        type: 'string',
-        enum: ['2-4 setmanes', 'Més endavant', 'Urgent'],
-        description: 'Timing preference - only if user explicitly mentions it'
+        description: 'General timeframe or availability the user mentions (e.g., "aquesta setmana", "dimarts", "aviat"). Keep it casual and tentative - just capture their preference.'
       },
       name: {
         type: 'string',
@@ -133,8 +131,8 @@ export async function getConversationalResponse(
 
     console.log('🔍 [DEBUG] Updated data:', JSON.stringify(updatedData, null, 2));
 
-    // Check if we have all required fields including name
-    const requiredFields = ['style', 'placement_size', 'color', 'budget', 'timing', 'name'];
+    // Check if we have all required fields for a basic estimate (avoid budget/tool booking)
+    const requiredFields = ['style', 'placement_size', 'color'];
     const isComplete = requiredFields.every(field => updatedData[field]);
 
     return {
@@ -177,8 +175,9 @@ Examples:
 - "a l'esquena de 20 centímetres" → extract: {placement_size: "esquena L"}
 - "de color negre" → extract: {color: "Blanc i negre"}
 - "l'estil és realista" → extract: {style: "Realisme"} (correction)
-- "pressupost menys de 100" → extract: {budget: "Menys de 150€"}
+- "aquesta setmana em va bé" → extract: {timing_preference: "aquesta setmana"}
 - "em dic Joan" → extract: {name: "Joan"}
+- "des del peu voltant el genoll fins la nuca" → extract: {description: "des del peu voltant el genoll fins la nuca"}
 
 If nothing to extract, do not call the function.`;
 
