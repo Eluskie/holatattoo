@@ -229,16 +229,50 @@ async function handleConfirmation(
 
     return { messages: finalMessages, delay: 1000 };
   } else {
-    // User wants to adjust something - go back to active
+    // User wants to adjust something - process their correction message
+    console.log('🔄 [DEBUG] User wants to correct something:', userMessage);
+
+    // Set back to active
     await prisma.conversation.update({
       where: { id: conversation.id },
       data: { status: 'active' }
     });
 
+    // Process their correction message through AI to extract corrections
+    const context: ConversationContext = {
+      collectedData: data,
+      conversationHistory: []
+    };
+
+    const aiResponse = await getConversationalResponse(userMessage, context);
+
+    console.log('🔄 [DEBUG] Corrections extracted:', aiResponse.extractedData);
+
+    // Update conversation with corrected data
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: {
+        collectedData: aiResponse.extractedData,
+        currentStep: (conversation.currentStep || 0) + 1
+      }
+    });
+
+    // If they provided all corrections and we're complete, send new recap
+    if (aiResponse.isComplete && aiResponse.extractedData.name) {
+      await prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { status: 'pending_confirmation' }
+      });
+
+      const recapMessages = await buildConfirmationRecap(aiResponse.extractedData);
+      return { messages: recapMessages, delay: 1000 };
+    }
+
+    // Otherwise acknowledge and ask what else needs changing
     return {
       messages: [
-        "Cap problema!",
-        "Què vols canviar?"
+        ...aiResponse.messages,
+        "Alguna cosa més a canviar?"
       ],
       delay: 800
     };
