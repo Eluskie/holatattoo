@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useUser } from '@clerk/nextjs'
 import toast from 'react-hot-toast'
 import { BotQuestion } from '@hola-tattoo/shared-types'
 
@@ -41,7 +40,6 @@ const DEFAULT_QUESTIONS: BotQuestion[] = [
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const { user } = useUser()
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
 

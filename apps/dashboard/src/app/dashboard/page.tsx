@@ -1,17 +1,9 @@
 import { prisma } from '@hola-tattoo/database'
-import { currentUser } from '@clerk/nextjs'
-import { redirect } from 'next/navigation'
+import { ConversationsTable } from '@/components/ConversationsTable'
 
 export default async function DashboardPage() {
-  const user = await currentUser()
-
-  if (!user) {
-    redirect('/sign-in')
-  }
-
-  // Find or create studio for this user
-  let studio = await prisma.studio.findUnique({
-    where: { email: user.emailAddresses[0].emailAddress },
+  // Get the first studio (no auth for now)
+  let studio = await prisma.studio.findFirst({
     include: {
       botConfig: true,
       conversations: {
@@ -21,9 +13,16 @@ export default async function DashboardPage() {
     }
   })
 
-  // If no studio exists, redirect to onboarding
+  // If no studio exists, show empty state
   if (!studio) {
-    redirect('/onboarding')
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-gray-900">No Studio Found</h1>
+          <p className="text-gray-600 mt-2">Please create a studio first.</p>
+        </div>
+      </div>
+    )
   }
 
   const stats = {
@@ -67,73 +66,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Recent Conversations */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Recent Conversations</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Phone
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Progress
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Created
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Data
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {studio.conversations.map((conv) => (
-                <tr key={conv.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {conv.userPhone}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      conv.status === 'qualified' ? 'bg-green-100 text-green-800' :
-                      conv.status === 'active' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {conv.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    Step {conv.currentStep}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(conv.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    <details>
-                      <summary className="cursor-pointer text-primary-600">View</summary>
-                      <pre className="mt-2 text-xs bg-gray-50 p-2 rounded">
-                        {JSON.stringify(conv.collectedData, null, 2)}
-                      </pre>
-                    </details>
-                  </td>
-                </tr>
-              ))}
-              {studio.conversations.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
-                    No conversations yet
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <ConversationsTable conversations={studio.conversations} />
     </div>
   )
 }

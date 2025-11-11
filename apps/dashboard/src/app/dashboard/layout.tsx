@@ -1,4 +1,3 @@
-import { UserButton } from '@clerk/nextjs'
 import Link from 'next/link'
 import { MessageSquare, Settings, BarChart3, Code } from 'lucide-react'
 
@@ -46,9 +45,6 @@ export default function DashboardLayout({
                   Widget
                 </Link>
               </div>
-            </div>
-            <div className="flex items-center">
-              <UserButton afterSignOutUrl="/" />
             </div>
           </div>
         </div>

@@ -1,11 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useUser } from '@clerk/nextjs'
 import toast from 'react-hot-toast'
 
 export default function SettingsPage() {
-  const { user } = useUser()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [studio, setStudio] = useState<any>(null)

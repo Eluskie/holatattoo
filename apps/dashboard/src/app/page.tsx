@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 
 export default function Home() {
   return (
@@ -11,29 +10,12 @@ export default function Home() {
               <h1 className="text-2xl font-bold text-primary-600">Hola Tattoo</h1>
             </div>
             <div className="flex items-center gap-4">
-              <SignedOut>
-                <Link
-                  href="/sign-in"
-                  className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-                >
-                  Sign In
-                </Link>
-                <Link
-                  href="/sign-up"
-                  className="bg-primary-600 text-white hover:bg-primary-700 px-4 py-2 rounded-md text-sm font-medium"
-                >
-                  Get Started
-                </Link>
-              </SignedOut>
-              <SignedIn>
-                <Link
-                  href="/dashboard"
-                  className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-                >
-                  Dashboard
-                </Link>
-                <UserButton afterSignOutUrl="/" />
-              </SignedIn>
+              <Link
+                href="/dashboard"
+                className="bg-primary-600 text-white hover:bg-primary-700 px-4 py-2 rounded-md text-sm font-medium"
+              >
+                Dashboard
+              </Link>
             </div>
           </div>
         </div>
@@ -51,28 +33,18 @@ export default function Home() {
             Capture leads 24/7 and send them directly to your CRM.
           </p>
           <div className="flex gap-4 justify-center">
-            <SignedOut>
-              <Link
-                href="/sign-up"
-                className="bg-primary-600 text-white hover:bg-primary-700 px-8 py-3 rounded-lg text-lg font-medium"
-              >
-                Start Free Trial
-              </Link>
-              <Link
-                href="#features"
-                className="border border-gray-300 text-gray-700 hover:bg-gray-50 px-8 py-3 rounded-lg text-lg font-medium"
-              >
-                Learn More
-              </Link>
-            </SignedOut>
-            <SignedIn>
-              <Link
-                href="/dashboard"
-                className="bg-primary-600 text-white hover:bg-primary-700 px-8 py-3 rounded-lg text-lg font-medium"
-              >
-                Go to Dashboard
-              </Link>
-            </SignedIn>
+            <Link
+              href="/dashboard"
+              className="bg-primary-600 text-white hover:bg-primary-700 px-8 py-3 rounded-lg text-lg font-medium"
+            >
+              Go to Dashboard
+            </Link>
+            <Link
+              href="#features"
+              className="border border-gray-300 text-gray-700 hover:bg-gray-50 px-8 py-3 rounded-lg text-lg font-medium"
+            >
+              Learn More
+            </Link>
           </div>
         </div>
 
