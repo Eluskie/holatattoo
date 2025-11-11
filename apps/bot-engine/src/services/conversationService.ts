@@ -34,7 +34,7 @@ async function addMessageToConversation(
     return;
   }
 
-  const messages = (Array.isArray(conversation.messages) ? conversation.messages : []) as ConversationMessage[];
+  const messages = (Array.isArray(conversation.messages) ? conversation.messages : []) as unknown as ConversationMessage[];
   messages.push({
     role,
     content,
