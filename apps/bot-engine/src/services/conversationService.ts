@@ -29,7 +29,10 @@ async function addMessageToConversation(
     where: { id: conversationId }
   });
 
-  if (!conversation) return;
+  if (!conversation) {
+    console.log(`⚠️  [MESSAGES] Conversation ${conversationId} not found`);
+    return;
+  }
 
   const messages = (conversation.messages as ConversationMessage[]) || [];
   messages.push({
@@ -38,10 +41,15 @@ async function addMessageToConversation(
     timestamp: new Date().toISOString()
   });
 
+  console.log(`💬 [MESSAGES] Adding message to ${conversationId}: ${role} - "${content.substring(0, 50)}..."`);
+  console.log(`💬 [MESSAGES] Total messages now: ${messages.length}`);
+
   await prisma.conversation.update({
     where: { id: conversationId },
     data: { messages }
   });
+
+  console.log(`✅ [MESSAGES] Saved ${messages.length} messages to database`);
 }
 
 /**
