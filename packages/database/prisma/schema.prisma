@@ -47,7 +47,7 @@ model Conversation {
   studio        Studio   @relation(fields: [studioId], references: [id], onDelete: Cascade)
 
   userPhone     String   @map("user_phone")
-  status        String   @default("active") // 'active', 'qualified', 'dropped'
+  status        String   @default("active") // 'active', 'pending_confirmation', 'qualified', 'dropped'
   currentStep   Int      @default(0) @map("current_step")
   collectedData Json     @default("{}") @map("collected_data")
 

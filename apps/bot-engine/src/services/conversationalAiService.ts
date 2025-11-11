@@ -82,8 +82,8 @@ export async function getConversationalResponse(
       ...extractedData
     };
 
-    // Check if we have all required fields (consent removed for MVP)
-    const requiredFields = ['style', 'placement_size', 'color', 'budget', 'timing'];
+    // Check if we have all required fields including name
+    const requiredFields = ['style', 'placement_size', 'color', 'budget', 'timing', 'name'];
     const isComplete = requiredFields.every(field => updatedData[field]);
 
     return {
@@ -114,13 +114,15 @@ User message: "${userMessage}"
 
 Already collected: ${JSON.stringify(currentData)}
 
-Extract these fields if present (don't extract if already collected):
+Extract these fields if present and NEW information is provided:
 - style: one of [Tradicional, Realisme, Línia fina, Neo-tradicional, Abstracte, No estic segur]
 - placement_size: location + size (e.g., "avantbraç M", "esquena L")
 - color: "Color", "Blanc i negre", or "No estic segur"
 - budget: "Menys de 150€", "150-300€", or "Més de 300€"
 - timing: "2-4 setmanes", "Més endavant", or "Urgent"
-- name: their name (only if they explicitly give it)
+- name: their name (ALWAYS extract if they give a name, even if name already exists)
+
+Important: If the user explicitly provides their name, always extract it even if 'name' already exists.
 
 Return ONLY JSON like: {"style": "Realisme", "placement_size": "braç M"}
 If nothing to extract, return: {}`;
@@ -138,10 +140,11 @@ If nothing to extract, return: {}`;
     // Try to parse JSON
     try {
       const extracted = JSON.parse(response);
-      // Only return fields that aren't already collected
+      // Only return fields that aren't already collected (except name, which can be updated)
       const newData: Record<string, any> = {};
       for (const [key, value] of Object.entries(extracted)) {
-        if (!currentData[key] && value) {
+        // Allow name to be updated, or add new fields
+        if ((key === 'name' || !currentData[key]) && value) {
           newData[key] = value;
         }
       }

@@ -73,9 +73,27 @@ export async function handleIncomingMessage(message: TwilioIncomingMessage): Pro
     where: {
       userPhone: userPhone,
       studioId: studio.id,
-      status: 'active'
+      status: { in: ['active', 'pending_confirmation'] }
     }
   });
+
+  // Check for finish intent (user wants to submit now)
+  const wantsToFinish = detectFinishIntent(message.Body);
+  if (wantsToFinish && conversation && conversation.status === 'active') {
+    // Check if we have enough data to proceed
+    const data = (conversation.collectedData as Record<string, any>) || {};
+    const hasMinimalData = data.style || data.placement_size || data.color;
+
+    if (hasMinimalData) {
+      // Mark as pending confirmation and send recap
+      await prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { status: 'pending_confirmation' }
+      });
+      const recapMessages = await buildConfirmationRecap(data);
+      return { messages: recapMessages, delay: 1000 };
+    }
+  }
 
   // If no active conversation, start a new one
   if (!conversation) {
@@ -113,6 +131,11 @@ async function processConversationalMessage(
     return { messages: ["Perdona, hi ha hagut un error.", "Torna a començar si us plau."], delay: 800 };
   }
 
+  // Check if conversation is pending confirmation
+  if (conversation.status === 'pending_confirmation') {
+    return await handleConfirmation(conversation, userMessage, studioId);
+  }
+
   // Build conversation context
   const context: ConversationContext = {
     collectedData: (conversation.collectedData as Record<string, any>) || {},
@@ -131,30 +154,124 @@ async function processConversationalMessage(
     }
   });
 
-  // If conversation is complete, send recap with price estimate
+  // If conversation is complete, send recap and ask for confirmation
   if (aiResponse.isComplete && !aiResponse.extractedData.name) {
     // AI will ask for name, don't send recap yet
     return { messages: aiResponse.messages, delay: 800 };
   } else if (aiResponse.isComplete && aiResponse.extractedData.name) {
-    // All done! Mark as qualified and send to webhook
+    // All data collected! Mark as pending confirmation
     await prisma.conversation.update({
       where: { id: conversationId },
+      data: { status: 'pending_confirmation' }
+    });
+
+    // Build recap and ask for confirmation
+    const recapMessages = await buildConfirmationRecap(aiResponse.extractedData);
+    return { messages: recapMessages, delay: 1000 };
+  }
+
+  // Return AI's conversational response
+  return { messages: aiResponse.messages, delay: 800 };
+}
+
+/**
+ * Detect if user is confirming (yes, sí, correcte, posteja, etc.)
+ */
+function detectConfirmation(message: string): boolean {
+  const confirmPhrases = [
+    'sí', 'si', 'yes', 'yeah', 'correcte', 'correcta', 'perfec', 'ok',
+    'posteja', 'envia', 'endavant', 'ja està', 'tot bé', 'tot perfecte',
+    'dale', 'va', 'vale', 'venga'
+  ];
+  const lowerMessage = message.toLowerCase().trim();
+  return confirmPhrases.some(phrase => lowerMessage.includes(phrase));
+}
+
+/**
+ * Detect if user wants to finish explicitly
+ */
+function detectFinishIntent(message: string): boolean {
+  const finishPhrases = [
+    'ja està', 'tot perfecte', 'posteja', 'envia', 'envia-ho',
+    'endavant', 'correcte així', 'prou', 'ja pots enviar'
+  ];
+  const lowerMessage = message.toLowerCase().trim();
+  return finishPhrases.some(phrase => lowerMessage.includes(phrase));
+}
+
+/**
+ * Handle confirmation state - user is confirming or adjusting the recap
+ */
+async function handleConfirmation(
+  conversation: any,
+  userMessage: string,
+  studioId: string
+): Promise<BotResponse> {
+  const data = (conversation.collectedData as Record<string, any>) || {};
+
+  // Check if user is confirming
+  const isConfirming = detectConfirmation(userMessage) || detectFinishIntent(userMessage);
+
+  if (isConfirming) {
+    // User confirmed! Submit lead and mark as qualified
+    await prisma.conversation.update({
+      where: { id: conversation.id },
       data: { status: 'qualified' }
     });
 
-    // Build recap with price estimate
+    // Build final recap with price estimate and send webhook
     const finalMessages = await buildFinalRecap(
-      aiResponse.extractedData,
-      conversationId,
+      data,
+      conversation.id,
       studioId,
       conversation.userPhone
     );
 
     return { messages: finalMessages, delay: 1000 };
+  } else {
+    // User wants to adjust something - go back to active
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { status: 'active' }
+    });
+
+    return {
+      messages: [
+        "Cap problema!",
+        "Què vols canviar?"
+      ],
+      delay: 800
+    };
+  }
+}
+
+/**
+ * Build confirmation recap (without price, just asks for confirmation)
+ */
+async function buildConfirmationRecap(data: Record<string, any>): Promise<string[]> {
+  const messages: string[] = [];
+
+  // Start with confirmation
+  messages.push("Perfecte! Deixa'm fer un resum:");
+
+  // Build summary parts
+  const summaryParts: string[] = [];
+  if (data.style) summaryParts.push(`Estil: ${data.style}`);
+  if (data.placement_size) summaryParts.push(`Ubicació: ${data.placement_size}`);
+  if (data.color) summaryParts.push(`Color: ${data.color}`);
+  if (data.budget) summaryParts.push(`Pressupost: ${data.budget}`);
+  if (data.timing) summaryParts.push(`Timing: ${data.timing}`);
+  if (data.name) summaryParts.push(`Nom: ${data.name}`);
+
+  // Add summary as separate message
+  if (summaryParts.length > 0) {
+    messages.push(summaryParts.join('\n'));
   }
 
-  // Return AI's conversational response
-  return { messages: aiResponse.messages, delay: 800 };
+  // Add confirmation question
+  messages.push("Tot correcte? Contesta 'Sí' per confirmar o digue'm què vols canviar.");
+
+  return messages;
 }
 
 /**

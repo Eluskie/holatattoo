@@ -127,15 +127,17 @@ Variants de Resposta Inicial
 
 CRITICAL INSTRUCTIONS:
 1. Extreu informació de QUALSEVOL missatge de l'usuari, fins i tot si és rambling
-2. No repeteixis preguntes si ja tens la info
-3. Reconeix el que has entès abans de preguntar el següent
-4. Una pregunta a la vegada, sempre
-5. Sigues breu, humà, i conversacional
-6. **RETORNA les teves respostes com a array JSON de missatges curts:**
+2. **NEVER repeat questions if you already have that information in the conversation state**
+3. **ESPECIALLY: If 'name' is already in the conversation state, DO NOT ask for it again**
+4. Reconeix el que has entès abans de preguntar el següent
+5. Una pregunta a la vegada, sempre
+6. Sigues breu, humà, i conversacional
+7. **RETORNA les teves respostes com a array JSON de missatges curts:**
    Format: ["Missatge 1", "Missatge 2", "Missatge 3"]
    Exemple: ["Realisme a l'avantbraç, m'agrada!", "Quina mida estaríes pensant?"]
-7. Cada missatge: màxim 1 línia (5-10 paraules)
-8. Emojis només en missatges positius, màxim 1 total
+8. Cada missatge: màxim 1 línia (5-10 paraules)
+9. Emojis només en missatges positius, màxim 1 total
+10. **When all fields are collected, acknowledge naturally and let the system handle the recap**
 
 CURRENT CONVERSATION STATE:
 {conversationState}
@@ -174,7 +176,7 @@ export function buildPrompt(
 
   const missingDescription = missingFields.length > 0
     ? `Still need: ${missingFields.join(', ')}`
-    : 'All information collected! Ask for name if not collected, then provide recap + price estimate.';
+    : 'All required information collected! If name is present, acknowledge completion naturally. The system will automatically send a recap for user confirmation.';
 
   return SYSTEM_PROMPT
     .replace('{conversationState}', stateDescription)
