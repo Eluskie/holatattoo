@@ -7,7 +7,7 @@ dist
 *.md
 .git
 .gitignore
-apps/dashboard
-packages/widget
 *.log
 .DS_Store
+# Note: removed apps/dashboard and packages/widget so dashboard build works
+# Bot engine doesn't need dashboard files but Docker caching handles it efficiently
