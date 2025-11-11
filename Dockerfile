@@ -1,5 +1,6 @@
 # Production Dockerfile for Hola Tattoo Bot Engine (Monorepo)
-FROM node:20-alpine AS base
+# Use Alpine 3.19 which has openssl1.1-compat package
+FROM node:20-alpine3.19 AS base
 
 # Install OpenSSL 1.1 compatibility for Prisma
 RUN apk add --no-cache openssl1.1-compat
