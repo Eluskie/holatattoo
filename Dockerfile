@@ -1,9 +1,9 @@
 # Production Dockerfile for Hola Tattoo Bot Engine (Monorepo)
-# Use Alpine 3.19 which has openssl1.1-compat package
-FROM node:20-alpine3.19 AS base
+# Use Debian slim for better Prisma compatibility
+FROM node:20-slim AS base
 
-# Install OpenSSL 1.1 compatibility for Prisma
-RUN apk add --no-cache openssl1.1-compat
+# Install OpenSSL and other dependencies for Prisma
+RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies only when needed
 FROM base AS deps
