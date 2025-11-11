@@ -32,6 +32,10 @@ const EXTRACT_TATTOO_INFO_FUNCTION = {
         type: 'string',
         description: 'Detailed description of the tattoo idea, placement, complexity, or any specific details the user provides. Capture the full context and details, especially for complex or multi-area tattoos.'
       },
+      placement_concept: {
+        type: 'string',
+        description: 'High-level placement concept derived from user phrasing (e.g., "envolta el braç", "cama completa", "des del peu fins la nuca", "cos parcial"). Use this when placement is complex/wraps/multi-area and an S/M/L/XL is not clearly stated.'
+      },
       placement_size: {
         type: 'string',
         description: 'Simple placement and approximate size for price estimation (e.g., "avantbraç M", "esquena L"). Format: location + size (S/M/L/XL). Only needed for basic price estimation.'
@@ -132,8 +136,11 @@ export async function getConversationalResponse(
     console.log('🔍 [DEBUG] Updated data:', JSON.stringify(updatedData, null, 2));
 
     // Check if we have all required fields for a basic estimate (avoid budget/tool booking)
-    const requiredFields = ['style', 'placement_size', 'color'];
-    const isComplete = requiredFields.every(field => updatedData[field]);
+    const hasPlacement =
+      Boolean(updatedData.placement_size) ||
+      Boolean(updatedData.description) ||
+      Boolean(updatedData.placement_concept);
+    const isComplete = Boolean(updatedData.style) && Boolean(updatedData.color) && hasPlacement;
 
     return {
       messages: messagesArray,
@@ -169,6 +176,8 @@ CRITICAL RULES:
 3. Do NOT include fields the user didn't mention
 4. If the user is correcting previous information, extract the corrected value
 5. For name: only extract if the user clearly provides their name
+6. If the user provides a complex or wrap-around placement (multi-area, "envolta", "volta", "puja fins", etc.), capture that as "placement_concept" (a short phrase in Catalan). Do NOT force a size (S/M/L/XL) unless clearly stated.
+7. If both a simple placement+size AND a complex description are present, include both: "placement_size" for estimation and "placement_concept"/"description" for hand-off.
 
 Examples:
 - "vull un tatuatge realista" → extract: {style: "Realisme"}
@@ -177,7 +186,8 @@ Examples:
 - "l'estil és realista" → extract: {style: "Realisme"} (correction)
 - "aquesta setmana em va bé" → extract: {timing_preference: "aquesta setmana"}
 - "em dic Joan" → extract: {name: "Joan"}
-- "des del peu voltant el genoll fins la nuca" → extract: {description: "des del peu voltant el genoll fins la nuca"}
+- "des del peu voltant el genoll fins la nuca" → extract: {description: "des del peu voltant el genoll fins la nuca", placement_concept: "de peu a nuca, envolta genoll"}
+- "que envolti el braç i segueixi pel cos" → extract: {placement_concept: "envolta el braç i segueix pel cos"}
 
 If nothing to extract, do not call the function.`;
 

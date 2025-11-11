@@ -69,7 +69,7 @@ Si l'usuari obre amb un salutació, pregunta, o RAMBLING (important!), respon ú
 Flow d'Informació (5-7 passos, però conversacional!)
 Necessites recollir (en qualsevol ordre natural!):
 1. Estil (tradicional, realisme, línia fina, neo-tradicional, abstracte, no segur)
-2. Ubicació + Mida (S fins 5cm, M 5-12cm, L 12-20cm, XL secció com mitja màniga)
+2. Ubicació: pot ser una idea general/complexa ("placement_concept") o una ubicació+mida simple ("placement_size"). Si l'usuari ja descriu que “envolta”, “puja fins…”, etc., assumeix que la ubicació està coberta i no forcis S/M/L/XL.
 3. Color vs blanc i negre
 4. Descripció/complexitat (frase lliure; ex: “des del peu fins la nuca, voltant genoll”)
 5. Timing preferit (casual, tentatiu; ex: “aquesta setmana”, “dimarts”, “aviat”)
@@ -82,7 +82,7 @@ Disseny de Preguntes
 - UNA pregunta per missatge. Mantén opcions estructurades quan sigui possible.
 - Exemples:
   - Estil: "Quin estil et mola: tradicional, realisme, línia fina, neo-tradicional, abstracte, o encara no estàs segur?"
-  - Ubicació/mida: "On al cos, i quina mida? S fins 5cm, M 5-12cm, L 12-20cm, XL secció completa."
+  - Ubicació (flexible): "Tal com ho descrius, ja tinc la ubicació. Vols afegir mida aproximada o ho deixem com 'envolta/continuat'?"
   - Color: "Prefereixes color o blanc i negre?"
   - Descripció/complexitat: "Vols descriure-ho una mica? Si és gran o envolta zones, m'ajuda."
   - Timing tentatiu: "Quan t’aniria bé de forma general? (ex: aquesta setmana, dimarts, aviat)"
@@ -159,22 +159,21 @@ export function buildPrompt(
   );
 
   // Minimal set needed for a basic estimate (no budget/tool booking)
-  const allRequiredFields = [
-    'style',
-    'placement_size',
-    'color'
-  ];
-
-  const missingFields = allRequiredFields.filter(
-    field => !conversationState[field]
-  );
+  const hasPlacement =
+    Boolean(conversationState['placement_size']) ||
+    Boolean(conversationState['description']) ||
+    Boolean(conversationState['placement_concept']);
+  const missingFieldsList: string[] = [];
+  if (!conversationState['style']) missingFieldsList.push('style');
+  if (!conversationState['color']) missingFieldsList.push('color');
+  if (!hasPlacement) missingFieldsList.push('ubicació (pot ser descripció/concepte)');
 
   const stateDescription = collectedFields.length > 0
     ? `Already collected: ${collectedFields.map(f => `${f}=${conversationState[f]}`).join(', ')}`
     : 'No information collected yet';
 
-  const missingDescription = missingFields.length > 0
-    ? `Still need: ${missingFields.join(', ')}`
+  const missingDescription = missingFieldsList.length > 0
+    ? `Still need: ${missingFieldsList.join(', ')}`
     : 'All required information collected for an estimate! If name is present, acknowledge completion naturally. The system will automatically send a recap for user confirmation.';
 
   return SYSTEM_PROMPT

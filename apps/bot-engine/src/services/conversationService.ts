@@ -292,6 +292,7 @@ async function buildConfirmationRecap(data: Record<string, any>): Promise<string
   const summaryParts: string[] = [];
   if (data.style) summaryParts.push(`Estil: ${data.style}`);
   if (data.placement_size) summaryParts.push(`Ubicació: ${data.placement_size}`);
+  if (data.placement_concept) summaryParts.push(`Ubicació (concepte): ${data.placement_concept}`);
   if (data.color) summaryParts.push(`Color: ${data.color}`);
   if (data.description) summaryParts.push(`Descripció: ${data.description}`);
   if (data.timing_preference) summaryParts.push(`Timing (tentatiu): ${data.timing_preference}`);
@@ -326,6 +327,7 @@ async function buildFinalRecap(
   const summaryParts: string[] = [];
   if (data.style) summaryParts.push(`Estil: ${data.style}`);
   if (data.placement_size) summaryParts.push(`Ubicació: ${data.placement_size}`);
+  if (data.placement_concept) summaryParts.push(`Ubicació (concepte): ${data.placement_concept}`);
   if (data.color) summaryParts.push(`Color: ${data.color}`);
   if (data.description) summaryParts.push(`Descripció: ${data.description}`);
   if (data.timing_preference) summaryParts.push(`Timing (tentatiu): ${data.timing_preference}`);
