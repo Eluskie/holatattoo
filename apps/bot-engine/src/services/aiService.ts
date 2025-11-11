@@ -78,14 +78,20 @@ export async function detectExitIntent(userMessage: string): Promise<boolean> {
     return false;
   }
 
+  // First check for negation patterns that mean "I DO want"
+  const wantsPhrases = ['nono', 'no no', 'vull un', 'vull fer', 'volia'];
+  if (wantsPhrases.some(p => msg.includes(p))) {
+    return false; // User is clarifying they DO want something
+  }
+
   // Explicit "not interested / cancel" phrases that DO indicate exit
   const uninterestedPhrases = [
-    'no m’interessa', 'no m interessa', 'no minteressa', 'no me interesa',
+    'no m'interessa', 'no m interessa', 'no minteressa', 'no me interesa',
     'not interested', 'no interest', 'no interested',
     'no vull seguir', 'passo', 'ho deixo', 'deixa-ho', 'deixa ho',
     'cancel·la', 'cancela', 'cancel', 'stop', 'parar', 'para', 'basta',
     'no gràcies', 'no gracias', 'no, gràcies', 'no, gracias',
-    'no vull', 'no em va bé i no vull'
+    'no vull cap', 'no em va bé i no vull'
   ];
   return uninterestedPhrases.some(p => msg.includes(p));
 }

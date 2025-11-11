@@ -30,7 +30,7 @@ const EXTRACT_TATTOO_INFO_FUNCTION = {
       },
       description: {
         type: 'string',
-        description: 'Detailed description of the tattoo idea, placement, complexity, or any specific details the user provides. Capture the full context and details, especially for complex or multi-area tattoos.'
+        description: 'Detailed description of the tattoo idea, placement, complexity, or any specific details the user provides. Capture the full context and details, especially for complex or multi-area tattoos. IMPORTANT: Only extract this if the user is describing the TATTOO itself, NOT answering other questions (like color choices or timing).'
       },
       placement_concept: {
         type: 'string',
@@ -42,8 +42,7 @@ const EXTRACT_TATTOO_INFO_FUNCTION = {
       },
       color: {
         type: 'string',
-        enum: ['Color', 'Blanc i negre', 'No estic segur'],
-        description: 'Color preference - only if user explicitly mentions it'
+        description: 'Color preference. Use "Color" for any colored tattoo (including specific colors like "negre groc i purpura"), "Blanc i negre" for black and white only, "No estic segur" if unsure. If user mentions specific colors, capture them in description field too.'
       },
       timing_preference: {
         type: 'string',
@@ -93,7 +92,7 @@ export async function getConversationalResponse(
       model: 'gpt-3.5-turbo',
       messages: messages,
       max_tokens: 200,
-      temperature: 0.3 // Lower temp to reduce repetition/drift
+      temperature: 0.2 // Very low temp for consistency
     });
 
     const assistantResponse = completion.choices[0]?.message?.content?.trim() ||
@@ -115,6 +114,16 @@ export async function getConversationalResponse(
         ? assistantResponse.split('\n').filter(m => m.trim())
         : [assistantResponse];
     }
+
+    // ENFORCE: Remove emojis from questions (any message ending with ?)
+    const emojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu;
+    messagesArray = messagesArray.map(msg => {
+      if (msg.includes('?')) {
+        // This is a question - REMOVE ALL EMOJIS
+        return msg.replace(emojiRegex, '').trim();
+      }
+      return msg;
+    });
 
     // Extract any new data from the user's message using a separate call
     const extractedData = await extractDataFromMessage(
@@ -175,11 +184,15 @@ CRITICAL RULES:
 5. For name: only extract if the user clearly provides their name
 6. If the user provides a complex or wrap-around placement (multi-area, "envolta", "volta", "puja fins", etc.), capture that as "placement_concept" (a short phrase in Catalan). Do NOT force a size (S/M/L/XL) unless clearly stated.
 7. If both a simple placement+size AND a complex description are present, include both: "placement_size" for estimation and "placement_concept"/"description" for hand-off.
+8. **NEVER extract "description" when user is just answering a color/timing/other question**. Description is ONLY for tattoo design details.
+9. For color: if user mentions specific colors like "negre groc i purpura", use color="Color" and add the specific colors to description.
 
 Examples:
 - "vull un tatuatge realista" → extract: {style: "Realisme"}
 - "a l'esquena de 20 centímetres" → extract: {placement_size: "esquena L"}
 - "de color negre" → extract: {color: "Blanc i negre"}
+- "negre groc i purpura" → extract: {color: "Color", description: "colors: negre groc i purpura"}
+- "els 3" (when asked about colors) → extract: {color: "Color"} (NOT description!)
 - "l'estil és realista" → extract: {style: "Realisme"} (correction)
 - "aquesta setmana em va bé" → extract: {timing_preference: "aquesta setmana"}
 - "em dic Joan" → extract: {name: "Joan"}
