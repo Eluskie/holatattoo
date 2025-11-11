@@ -65,9 +65,9 @@ export function ConversationsTable({ conversations }: Props) {
           <tbody className="bg-white divide-y divide-gray-200">
             {conversations.map((conv) => {
               const name = getDataValue(conv.collectedData, 'name')
-              const description = getDataValue(conv.collectedData, 'tattoo_description') ||
-                                getDataValue(conv.collectedData, 'description') ||
-                                getDataValue(conv.collectedData, 'tattoo_type')
+              const description = getDataValue(conv.collectedData, 'description') ||
+                                getDataValue(conv.collectedData, 'style') ||
+                                getDataValue(conv.collectedData, 'placement_size')
 
               return (
                 <tr key={conv.id}>
@@ -121,6 +121,30 @@ export function ConversationsTable({ conversations }: Props) {
                           </SheetHeader>
 
                           <div className="mt-6 space-y-6">
+                            {/* Conversation History */}
+                            <div>
+                              <h3 className="text-sm font-semibold text-gray-900 mb-3">Conversation History</h3>
+                              <div className="space-y-3 max-h-96 overflow-y-auto">
+                                {((conv as any).messages || []).map((msg: any, idx: number) => (
+                                  <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                                      msg.role === 'user'
+                                        ? 'bg-blue-100 text-gray-900'
+                                        : 'bg-gray-100 text-gray-900'
+                                    }`}>
+                                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                      <p className="text-xs text-gray-500 mt-1">
+                                        {new Date(msg.timestamp).toLocaleTimeString()}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))}
+                                {((conv as any).messages || []).length === 0 && (
+                                  <p className="text-sm text-gray-500 italic">No messages yet</p>
+                                )}
+                              </div>
+                            </div>
+
                             {/* Collected Data */}
                             <div>
                               <h3 className="text-sm font-semibold text-gray-900 mb-3">Collected Information</h3>

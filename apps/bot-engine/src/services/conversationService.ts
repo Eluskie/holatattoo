@@ -11,6 +11,39 @@ export interface BotResponse {
   delay?: number; // milliseconds to wait between messages
 }
 
+interface ConversationMessage {
+  role: 'user' | 'bot';
+  content: string;
+  timestamp: string;
+}
+
+/**
+ * Add a message to the conversation history
+ */
+async function addMessageToConversation(
+  conversationId: string,
+  role: 'user' | 'bot',
+  content: string
+): Promise<void> {
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId }
+  });
+
+  if (!conversation) return;
+
+  const messages = (conversation.messages as ConversationMessage[]) || [];
+  messages.push({
+    role,
+    content,
+    timestamp: new Date().toISOString()
+  });
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { messages }
+  });
+}
+
 /**
  * Main handler for incoming WhatsApp messages
  */
@@ -36,39 +69,7 @@ export async function handleIncomingMessage(message: TwilioIncomingMessage): Pro
     return { messages: ["Perdona, hi ha hagut un error."], delay: 800 };
   }
 
-  // Check for exit intent
-  const wantsToExit = await detectExitIntent(message.Body);
-  if (wantsToExit) {
-    await markConversationAsDropped(userPhone, studio.id);
-    return { messages: ["D'acord!", "Si canvies d'opinió, escriu-me quan vulguis."], delay: 800 };
-  }
-
-  // Check for medical questions
-  const isMedicalQuestion = await detectMedicalQuestion(message.Body);
-  if (isMedicalQuestion) {
-    return {
-      messages: [
-        "No puc donar consells mèdics.",
-        "L'estudi segueix protocols estàndard de cura posterior.",
-        "Per temes mèdics, consulta un professional."
-      ],
-      delay: 800
-    };
-  }
-
-  // Check for complex requests
-  const isComplexRequest = await detectComplexRequest(message.Body);
-  if (isComplexRequest) {
-    return {
-      messages: [
-        "Això necessita una consulta personalitzada amb un artista.",
-        "T'agradaria que et contacti algú de l'estudi directament?"
-      ],
-      delay: 800
-    };
-  }
-
-  // Find or create conversation
+  // Find existing conversation first (for message logging in early returns)
   let conversation = await prisma.conversation.findFirst({
     where: {
       userPhone: userPhone,
@@ -77,9 +78,59 @@ export async function handleIncomingMessage(message: TwilioIncomingMessage): Pro
     }
   });
 
+  // Check for exit intent
+  const wantsToExit = await detectExitIntent(message.Body);
+  if (wantsToExit) {
+    if (conversation) {
+      await addMessageToConversation(conversation.id, 'user', message.Body);
+      const exitMsgs = ["D'acord!", "Si canvies d'opinió, escriu-me quan vulguis."];
+      for (const msg of exitMsgs) {
+        await addMessageToConversation(conversation.id, 'bot', msg);
+      }
+    }
+    await markConversationAsDropped(userPhone, studio.id);
+    return { messages: ["D'acord!", "Si canvies d'opinió, escriu-me quan vulguis."], delay: 800 };
+  }
+
+  // Check for medical questions
+  const isMedicalQuestion = await detectMedicalQuestion(message.Body);
+  if (isMedicalQuestion) {
+    const medicalMsgs = [
+      "No puc donar consells mèdics.",
+      "L'estudi segueix protocols estàndard de cura posterior.",
+      "Per temes mèdics, consulta un professional."
+    ];
+    if (conversation) {
+      await addMessageToConversation(conversation.id, 'user', message.Body);
+      for (const msg of medicalMsgs) {
+        await addMessageToConversation(conversation.id, 'bot', msg);
+      }
+    }
+    return { messages: medicalMsgs, delay: 800 };
+  }
+
+  // Check for complex requests
+  const isComplexRequest = await detectComplexRequest(message.Body);
+  if (isComplexRequest) {
+    const complexMsgs = [
+      "Això necessita una consulta personalitzada amb un artista.",
+      "T'agradaria que et contacti algú de l'estudi directament?"
+    ];
+    if (conversation) {
+      await addMessageToConversation(conversation.id, 'user', message.Body);
+      for (const msg of complexMsgs) {
+        await addMessageToConversation(conversation.id, 'bot', msg);
+      }
+    }
+    return { messages: complexMsgs, delay: 800 };
+  }
+
   // Check for finish intent (user wants to submit now)
   const wantsToFinish = detectFinishIntent(message.Body);
   if (wantsToFinish && conversation && conversation.status === 'active') {
+    // Save user message
+    await addMessageToConversation(conversation.id, 'user', message.Body);
+
     // Check if we have enough data to proceed
     const data = (conversation.collectedData as Record<string, any>) || {};
     const hasMinimalData = data.style || data.placement_size || data.color;
@@ -91,6 +142,10 @@ export async function handleIncomingMessage(message: TwilioIncomingMessage): Pro
         data: { status: 'pending_confirmation' }
       });
       const recapMessages = await buildConfirmationRecap(data);
+      // Save recap messages
+      for (const msg of recapMessages) {
+        await addMessageToConversation(conversation.id, 'bot', msg);
+      }
       return { messages: recapMessages, delay: 1000 };
     }
   }
@@ -103,16 +158,34 @@ export async function handleIncomingMessage(message: TwilioIncomingMessage): Pro
         studioId: studio.id,
         status: 'active',
         currentStep: 0,
-        collectedData: {}
+        collectedData: {},
+        messages: []
       }
     });
 
+    // Save user's first message
+    await addMessageToConversation(conversation.id, 'user', message.Body);
+
     // Send welcome message
-    return { messages: [studio.botConfig.welcomeMessage], delay: 800 };
+    const welcomeMsg = studio.botConfig.welcomeMessage;
+    await addMessageToConversation(conversation.id, 'bot', welcomeMsg);
+    return { messages: [welcomeMsg], delay: 800 };
   }
 
+  // Save user message
+  await addMessageToConversation(conversation.id, 'user', message.Body);
+
   // Process the user's response with conversational AI
-  return await processConversationalMessage(conversation.id, message.Body, studio.id);
+  const response = await processConversationalMessage(conversation.id, message.Body, studio.id);
+
+  // Save bot response messages
+  if (response) {
+    for (const msg of response.messages) {
+      await addMessageToConversation(conversation.id, 'bot', msg);
+    }
+  }
+
+  return response;
 }
 
 /**

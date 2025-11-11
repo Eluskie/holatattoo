@@ -50,6 +50,7 @@ model Conversation {
   status        String   @default("active") // 'active', 'pending_confirmation', 'qualified', 'dropped'
   currentStep   Int      @default(0) @map("current_step")
   collectedData Json     @default("{}") @map("collected_data")
+  messages      Json     @default("[]") // Array of {role: 'user'|'bot', content: string, timestamp: string}
 
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
