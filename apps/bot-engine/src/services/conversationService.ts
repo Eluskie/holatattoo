@@ -252,12 +252,20 @@ async function processConversationalMessage(
   const recentMessages = messages.slice(-10);
   
   // Convert to OpenAI format
-  const conversationHistory = recentMessages.map((msg: ConversationMessage) => ({
+  let conversationHistory = recentMessages.map((msg: ConversationMessage) => ({
     role: msg.role === 'user' ? 'user' as const : 'assistant' as const,
     content: msg.content
   }));
 
-  console.log(`📜 [HISTORY] Using ${conversationHistory.length} recent messages for context`);
+  // CRITICAL FIX #1: For new conversations (first user message), start with empty history
+  // This prevents hallucination from previous conversation messages
+  const isFirstUserMessage = (conversation.currentStep || 0) === 0;
+  if (isFirstUserMessage) {
+    console.log('🆕 [HISTORY] New conversation - starting with empty history to prevent hallucination');
+    conversationHistory = [];
+  } else {
+    console.log(`📜 [HISTORY] Using ${conversationHistory.length} recent messages for context`);
+  }
 
   const context: ConversationContext = {
     collectedData: (conversation.collectedData as Record<string, any>) || {},

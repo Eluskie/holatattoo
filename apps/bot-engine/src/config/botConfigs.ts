@@ -89,7 +89,7 @@ export const PEP_CONFIG: BotConfig = {
       type: 'function',
       function: {
         name: 'answer_studio_question',
-        description: 'User is asking about studio information (location, hours, prices, artists, etc.). Use this to log the question category.',
+        description: 'CALL IMMEDIATELY when user asks about studio (location, hours, prices, artists, booking). Use this to log the question category while you answer in your response text.',
         parameters: {
           type: 'object',
           properties: {
@@ -111,35 +111,35 @@ export const PEP_CONFIG: BotConfig = {
       type: 'function',
       function: {
         name: 'extract_tattoo_info',
-        description: 'Extract and save tattoo information when user describes their tattoo idea. Extract only what they explicitly mention.',
+        description: 'CRITICAL: ALWAYS call this IMMEDIATELY when user mentions ANY tattoo detail - style (e.g. "realisme", "tradicional"), color, placement/location, size, timing, or name. Extract ONLY what they explicitly said in THIS message. Do NOT wait - call this function right away.',
         parameters: {
           type: 'object',
           properties: {
             description: {
               type: 'string',
-              description: 'What tattoo they want (e.g., "rosa", "dragon", "mandala")'
+              description: 'What tattoo they want (e.g., "rosa", "dragon", "mandala"). Only if mentioned in THIS message.'
             },
             placement: {
               type: 'string',
-              description: 'Where on body (e.g., "braç", "bíceps", "esquena")'
+              description: 'Where on body (e.g., "braç", "bíceps", "esquena"). Only if mentioned in THIS message.'
             },
             style: {
               type: 'string',
               enum: ['Realisme', 'Tradicional', 'Línia fina', 'Neo-tradicional', 'Abstracte', 'No especificat'],
-              description: 'Tattoo style preference'
+              description: 'Tattoo style - extract if user says "realisme", "tradicional", "línia fina", etc. in THIS message.'
             },
             color: {
               type: 'string',
               enum: ['Blanc i negre', 'Color', 'No especificat'],
-              description: 'Color preference'
+              description: 'Color preference - extract if user mentions color in THIS message.'
             },
             timing_preference: {
               type: 'string',
-              description: 'When they want it (e.g., "aquesta setmana", "tardes", "cap de setmana")'
+              description: 'When they want it (e.g., "aquesta setmana", "tardes"). Only if mentioned in THIS message.'
             },
             name: {
               type: 'string',
-              description: "User's name if they provided it"
+              description: "User's name if they provided it in THIS message."
             }
           },
           required: []
@@ -183,7 +183,7 @@ export const PEP_CONFIG: BotConfig = {
     }
   ],
   settings: {
-    temperature: 0.3, // Good balance for consistency
+    temperature: 0.4, // FIX #3: Slightly higher for more consistent tool calling
     maxTokens: 200, // Reasonable length with 128K context
     model: 'gpt-4o-mini' // Cheaper + better than gpt-3.5-turbo!
   }
@@ -243,25 +243,28 @@ Com funciona:
 3. Un artista contacta l'usuari en 1-2 dies per concretar cita i detalls
 
 === EINES DISPONIBLES ===
-Tens 4 eines. USA-LES SILENCIOSAMENT (no diguis "ara usaré l'eina X"):
+Tens 4 eines. USA-LES IMMEDIATAMENT quan calgui (no diguis "ara usaré l'eina X"):
 
-1. **answer_studio_question**
+1. **answer_studio_question** → Crida SEMPRE que pregunta sobre l'estudi
    Quan: L'usuari pregunta sobre l'estudi (ubicació, horari, preus, artistes, procés)
    Què fa: Registra el tipus de pregunta
    Tu: Dones la resposta en el teu missatge
+   Exemple: User diu "a on esteu?" → CRIDA answer_studio_question + Respon "Som a Barcelona..."
 
-2. **extract_tattoo_info**
-   Quan: L'usuari menciona detalls del tattoo (descripció, ubicació, estil, color, timing, nom)
+2. **extract_tattoo_info** → Crida IMMEDIATAMENT quan esmenta detalls del tattoo
+   Quan: L'usuari menciona QUALSEVOL detall: estil ("realisme", "tradicional"), color, ubicació, mida, timing, nom
    Què fa: Guarda la informació automàticament
    Tu: Continues la conversa naturalment
+   CRÍTIC: Si diu "realisme" o "tradicional" o qualsevol estil → CRIDA extract_tattoo_info amb style!
+   Exemple: User diu "realisme pur i dur" → CRIDA extract_tattoo_info(style="Realisme")
 
-3. **ready_to_send**
+3. **ready_to_send** → Crida quan confirma després de tenir mínim info
    Quan: Tens descripció + ubicació + nom I l'usuari confirma que vol continuar
    Frases clau: "vale", "sí", "endavant", "perfecte", "ja està"
    Què fa: Envia el lead qualificat a l'estudi
    Tu: Confirmes i dones next steps
 
-4. **close_conversation**
+4. **close_conversation** → Crida quan agraeix DESPRÉS d'enviar
    Quan: L'usuari diu gràcies/adeu DESPRÉS que ja hàgis enviat la info a l'estudi
    Què fa: Tanca la conversa elegantment
    Tu: Respon càlidament sense repetir informació

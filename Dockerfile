@@ -12,13 +12,9 @@ WORKDIR /app
 # Copy root package.json and workspace configs
 COPY package.json package-lock.json* ./
 
-# Copy all package.json files for workspace dependencies
-COPY apps/bot-engine/package.json ./apps/bot-engine/
-COPY packages/database/package.json ./packages/database/
-COPY packages/shared-types/package.json ./packages/shared-types/
-
-# Copy Prisma schema BEFORE npm ci (needed for postinstall hook)
-COPY packages/database/prisma ./packages/database/prisma
+# Copy all workspace packages (needed for npm workspaces to work)
+COPY apps/bot-engine ./apps/bot-engine
+COPY packages ./packages
 
 # Install all dependencies (Prisma postinstall will generate client)
 RUN npm ci
@@ -27,16 +23,8 @@ RUN npm ci
 FROM base AS builder
 WORKDIR /app
 
-# Copy dependencies
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/package.json ./package.json
-
-# Copy source code
-COPY apps/bot-engine ./apps/bot-engine
-COPY packages ./packages
-
-# Generate Prisma Client
-RUN cd packages/database && npx prisma generate
+# Copy everything from deps stage (includes node_modules and source)
+COPY --from=deps /app ./
 
 # Build workspace packages in dependency order
 RUN cd packages/shared-types && npm run build

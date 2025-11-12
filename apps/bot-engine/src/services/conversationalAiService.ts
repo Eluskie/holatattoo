@@ -109,13 +109,33 @@ export async function getConversationalResponse(
     });
 
     const message = completion.choices[0]?.message;
-    const assistantResponse = message?.content?.trim() ||
-      'Perdona, no t\'he entès bé. Pots repetir?';
-
-    console.log(`🤖 [${config.name}] GPT Response:`, assistantResponse);
-    
-    // Check if tools were used
     const toolCalls = message?.tool_calls || [];
+    
+    // FIX #4: Generate intelligent response when GPT uses tools without text
+    // This prevents "Perdona, no t'he entès bé" when extraction is actually working
+    let assistantResponse: string;
+    if (toolCalls.length > 0 && (!message?.content || message.content.trim() === '')) {
+      // GPT called tools but didn't provide text - generate appropriate response
+      const toolNames = toolCalls.map(t => t.function.name);
+      
+      if (toolNames.includes('ready_to_send')) {
+        assistantResponse = "Perfecte! Passo la informació a l'estudi. Et contactaran aviat! 👍";
+      } else if (toolNames.includes('close_conversation')) {
+        assistantResponse = "De res! Fins aviat! 😊";
+      } else if (toolNames.includes('extract_tattoo_info')) {
+        assistantResponse = "Entesos!";
+      } else if (toolNames.includes('answer_studio_question')) {
+        assistantResponse = "D'acord!";
+      } else {
+        assistantResponse = "D'acord!";
+      }
+      console.log(`🤖 [${config.name}] Auto-generated response (tools without text):`, assistantResponse);
+    } else {
+      assistantResponse = message?.content?.trim() || 'Perdona, no t\'he entès bé. Pots repetir?';
+      console.log(`🤖 [${config.name}] GPT Response:`, assistantResponse);
+    }
+    
+    // Log tools used
     if (toolCalls.length > 0) {
       console.log(`🛠️  [${config.name}] Tools called:`, toolCalls.map(t => t.function.name));
     }
@@ -162,8 +182,24 @@ export async function getConversationalResponse(
 
         switch (toolName) {
           case 'extract_tattoo_info':
-            // Merge extracted tattoo info
-            extractedData = { ...extractedData, ...args };
+            // FIX #2: Smart merge - don't overwrite good data with empty/generic values
+            // This prevents issues when GPT makes multiple extract_tattoo_info calls
+            for (const [key, value] of Object.entries(args)) {
+              const currentValue = extractedData[key];
+              const isValueEmpty = !value || value === '' || value === 'No especificat';
+              const isCurrentEmpty = !currentValue || currentValue === '' || currentValue === 'No especificat';
+              
+              // Update if: new value is non-empty AND (current is empty OR current is generic)
+              const shouldUpdate = !isValueEmpty && isCurrentEmpty;
+              
+              if (shouldUpdate) {
+                console.log(`  ✅ [EXTRACT] ${key}: "${currentValue || '(empty)'}" → "${value}"`);
+                extractedData[key] = value;
+              } else if (!isValueEmpty && !isCurrentEmpty && currentValue !== value) {
+                // Conflicting values - keep existing (it was extracted first)
+                console.log(`  ⚠️  [EXTRACT] ${key}: keeping "${currentValue}" (ignoring conflicting "${value}")`);
+              }
+            }
             break;
           
           case 'answer_studio_question':
