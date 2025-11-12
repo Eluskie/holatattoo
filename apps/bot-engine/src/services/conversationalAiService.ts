@@ -115,7 +115,7 @@ export async function getConversationalResponse(
     // This prevents "Perdona, no t'he entès bé" when extraction is actually working
     let assistantResponse: string;
     if (toolCalls.length > 0 && (!message?.content || message.content.trim() === '')) {
-      // GPT called tools but didn't provide text - generate appropriate response
+      // GPT called tools but didn't provide text - generate contextual response
       const toolNames = toolCalls.map(t => t.function.name);
       
       if (toolNames.includes('ready_to_send')) {
@@ -123,7 +123,9 @@ export async function getConversationalResponse(
       } else if (toolNames.includes('close_conversation')) {
         assistantResponse = "De res! Fins aviat! 😊";
       } else if (toolNames.includes('extract_tattoo_info')) {
-        assistantResponse = "Entesos!";
+        // Smart response based on what we have and what's missing
+        // We'll know what was extracted after processing tool calls
+        assistantResponse = ""; // Will be set after processing
       } else if (toolNames.includes('answer_studio_question')) {
         assistantResponse = "D'acord!";
       } else {
@@ -238,6 +240,32 @@ export async function getConversationalResponse(
     };
 
     console.log('🔍 [DEBUG] Updated data:', JSON.stringify(updatedData, null, 2));
+
+    // Generate smart auto-response if needed (when extract_tattoo_info was called without text)
+    if (assistantResponse === '' && toolsUsed.includes('extract_tattoo_info')) {
+      const hasDescription = Boolean(updatedData.description);
+      const hasPlacement = Boolean(updatedData.placement);
+      const hasName = Boolean(updatedData.name);
+      
+      if (hasDescription && hasPlacement && !hasName) {
+        // Have description + placement, need name
+        assistantResponse = "Perfecte! Només em falta el teu nom per passar la info a l'estudi.";
+      } else if (hasDescription && !hasPlacement) {
+        // Have description, need placement
+        assistantResponse = "Genial! A quina part del cos?";
+      } else if (!hasDescription && hasPlacement) {
+        // Have placement, need description (rare but possible)
+        assistantResponse = "Entesos! Explica'm més sobre què vols tatuarte.";
+      } else if (!hasDescription && !hasPlacement) {
+        // Just starting or minimal info
+        assistantResponse = "Entesos! Explica'm més.";
+      } else {
+        // Have everything or other case
+        assistantResponse = "Genial!";
+      }
+      console.log(`🎯 [SMART-RESPONSE] Generated: "${assistantResponse}" (has: desc=${hasDescription}, place=${hasPlacement}, name=${hasName})`);
+      messagesArray = [assistantResponse];
+    }
 
     // Determine if conversation is complete
     // For Current: description AND (style OR color)
