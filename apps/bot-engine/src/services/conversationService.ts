@@ -245,10 +245,23 @@ async function processConversationalMessage(
     return await handleConfirmation(conversation, userMessage, studioId);
   }
 
-  // Build conversation context
+  // Build conversation context with recent message history
+  const messages = (Array.isArray(conversation.messages) ? conversation.messages : []) as ConversationMessage[];
+  
+  // Get last 10 messages for context (avoid token limits)
+  const recentMessages = messages.slice(-10);
+  
+  // Convert to OpenAI format
+  const conversationHistory = recentMessages.map((msg: ConversationMessage) => ({
+    role: msg.role === 'user' ? 'user' as const : 'assistant' as const,
+    content: msg.content
+  }));
+
+  console.log(`📜 [HISTORY] Using ${conversationHistory.length} recent messages for context`);
+
   const context: ConversationContext = {
     collectedData: (conversation.collectedData as Record<string, any>) || {},
-    conversationHistory: []
+    conversationHistory
   };
 
   // Get AI response using active config
