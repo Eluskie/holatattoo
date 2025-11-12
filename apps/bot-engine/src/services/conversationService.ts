@@ -1,6 +1,6 @@
 import { prisma } from '@hola-tattoo/database';
 import { TwilioIncomingMessage, QualifiedLead } from '@hola-tattoo/shared-types';
-import { detectExitIntent, detectMedicalQuestion, detectComplexRequest } from './aiService';
+import { detectExitIntent, detectMedicalQuestion, detectComplexRequest, detectGratitudeIntent } from './aiService';
 import { sendLeadToWebhook } from './webhookService';
 import { calculatePriceRange, formatPriceRange, hasEnoughDataForEstimate } from './priceEstimationService';
 import { getConversationalResponse, ConversationContext } from './conversationalAiService';
@@ -158,8 +158,34 @@ export async function handleIncomingMessage(message: TwilioIncomingMessage): Pro
     }
   }
 
-  // If no active conversation, start a new one
+  // If no active conversation, check if this is gratitude after a recent qualified conversation
   if (!conversation) {
+    // Check for recently qualified conversation (within last 10 minutes)
+    const recentQualified = await prisma.conversation.findFirst({
+      where: {
+        userPhone: userPhone,
+        studioId: studio.id,
+        status: 'qualified',
+        updatedAt: {
+          gte: new Date(Date.now() - 10 * 60 * 1000) // 10 minutes ago
+        }
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
+
+    // If user is just saying thanks after qualification, respond gracefully without restarting
+    if (recentQualified && detectGratitudeIntent(message.Body)) {
+      console.log('✅ [GRATITUDE] Detected gratitude after qualified conversation - responding without restart');
+      const gratitudeResponse = ["De res! 😊"];
+      
+      // Log this to the qualified conversation for continuity
+      await addMessageToConversation(recentQualified.id, 'user', message.Body);
+      await addMessageToConversation(recentQualified.id, 'bot', gratitudeResponse[0]);
+      
+      return { messages: gratitudeResponse, delay: 800 };
+    }
+
+    // Otherwise, start a new conversation
     conversation = await prisma.conversation.create({
       data: {
         userPhone: userPhone,
@@ -402,6 +428,8 @@ async function buildConfirmationRecap(data: Record<string, any>): Promise<string
 
 /**
  * Build final recap messages with price estimate (split into multiple messages)
+ * NOTE: We don't repeat the summary here - user just confirmed it!
+ * Just acknowledge, provide price, and close gracefully.
  */
 async function buildFinalRecap(
   data: Record<string, any>,
@@ -411,22 +439,8 @@ async function buildFinalRecap(
 ): Promise<string[]> {
   const messages: string[] = [];
 
-  // Start with confirmation
-  messages.push("Perfecte! Deixa'm fer un resum:");
-
-  // Build summary parts
-  const summaryParts: string[] = [];
-  if (data.style) summaryParts.push(`Estil: ${data.style}`);
-  if (data.placement_size) summaryParts.push(`Ubicació: ${data.placement_size}`);
-  if (data.placement_concept) summaryParts.push(`Ubicació (concepte): ${data.placement_concept}`);
-  if (data.color) summaryParts.push(`Color: ${data.color}`);
-  if (data.description) summaryParts.push(`Descripció: ${data.description}`);
-  if (data.timing_preference) summaryParts.push(`Timing (tentatiu): ${data.timing_preference}`);
-
-  // Add summary as separate message
-  if (summaryParts.length > 0) {
-    messages.push(summaryParts.join('\n'));
-  }
+  // Simple acknowledgment (no need to repeat the summary!)
+  messages.push("Perfecte! ✓");
 
   // Add price estimate
   if (hasEnoughDataForEstimate(data)) {
@@ -434,8 +448,8 @@ async function buildFinalRecap(
     messages.push(formatPriceRange(priceRange));
   }
 
-  // Final message with emoji (positive sentiment!)
-  messages.push(`Passo la informació a l'estudi.`);
+  // Final message - pass info to studio
+  messages.push("Passo la informació a l'estudi.");
   messages.push(`Et contactaran aviat, ${data.name || 'gràcies'}! 😊`);
 
   // Send lead to webhook

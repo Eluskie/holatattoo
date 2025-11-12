@@ -111,6 +111,35 @@ export async function detectMedicalQuestion(userMessage: string): Promise<boolea
 }
 
 /**
+ * Detect if user is expressing gratitude/acknowledgment (post-qualification)
+ * This is a simple, free check to avoid restarting conversations unnecessarily
+ */
+export function detectGratitudeIntent(userMessage: string): boolean {
+  const gratitudePhrases = [
+    'gràcies', 'gracias', 'gracies', 'merci', 'thanks', 'thank you',
+    'moltes gràcies', 'muchas gracias', 'molt agraït', 'molt agraida',
+    'perfecte', 'perfecto', 'perfect', 'genial', 'ok', 'vale', 'ok!',
+    'd\'acord', 'de acuerdo', 'entesos', 'entendido', 'rebut', 'recibido'
+  ];
+
+  const lowerMessage = userMessage.toLowerCase().trim();
+  
+  // Simple gratitude message (just thanks with optional punctuation)
+  if (gratitudePhrases.some(phrase => {
+    const msg = lowerMessage.replace(/[!.¡¿?]/g, '').trim();
+    return msg === phrase || msg === `${phrase}`;
+  })) {
+    return true;
+  }
+
+  // Thanks followed by emoji or short message
+  const hasGratitude = gratitudePhrases.some(phrase => lowerMessage.includes(phrase));
+  const isShort = lowerMessage.length < 30; // Short message
+  
+  return hasGratitude && isShort;
+}
+
+/**
  * Detect if request is complex and needs human handoff
  */
 export async function detectComplexRequest(userMessage: string, collectedData?: any): Promise<boolean> {
