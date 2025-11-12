@@ -246,7 +246,7 @@ async function processConversationalMessage(
   }
 
   // Build conversation context with recent message history
-  const messages = (Array.isArray(conversation.messages) ? conversation.messages : []) as ConversationMessage[];
+  const messages = (Array.isArray(conversation.messages) ? conversation.messages : []) as unknown as ConversationMessage[];
   
   // Get last 10 messages for context (avoid token limits)
   const recentMessages = messages.slice(-10);
