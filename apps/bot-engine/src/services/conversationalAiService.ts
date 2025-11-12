@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { buildPrompt } from '../prompts/systemPrompt';
+import { ACTIVE_CONFIG, type BotConfig } from '../config/botConfigs';
 
 let openai: OpenAI;
 
@@ -66,19 +67,29 @@ export interface AIResponse {
   messages: string[]; // Changed from single message to array
   extractedData: Record<string, any>;
   isComplete: boolean;
+  toolsUsed?: string[]; // Track which tools were called
+  readyToSend?: boolean; // Pep: user ready to send to studio
+  shouldClose?: boolean; // Pep: conversation should close gracefully
 }
 
 /**
  * Main conversational AI handler
  * Uses GPT to drive the entire conversation naturally
+ * Now supports different bot configurations (Pep, Current, etc.)
  */
 export async function getConversationalResponse(
   userMessage: string,
-  context: ConversationContext
+  context: ConversationContext,
+  config: BotConfig = ACTIVE_CONFIG
 ): Promise<AIResponse> {
   try {
+    console.log(`🤖 [CONFIG] Using bot configuration: ${config.name}`);
+
     // Build the system prompt with current state
-    const systemPrompt = buildPrompt(context.collectedData, userMessage);
+    const systemPrompt = typeof config.systemPrompt === 'function'
+      ? config.systemPrompt(context.collectedData, userMessage)
+      : config.systemPrompt.replace('{{collectedData}}', JSON.stringify(context.collectedData))
+                          .replace('{{userMessage}}', userMessage);
 
     // Add user message to history
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -87,56 +98,104 @@ export async function getConversationalResponse(
       { role: 'user', content: userMessage }
     ];
 
-    // Get response from GPT
+    // Get response from GPT with config settings
     const completion = await getOpenAI().chat.completions.create({
-      model: 'gpt-3.5-turbo',
+      model: config.settings.model,
       messages: messages,
-      max_tokens: 200,
-      temperature: 0.2 // Very low temp for consistency
+      max_tokens: config.settings.maxTokens,
+      temperature: config.settings.temperature,
+      tools: config.tools.length > 0 ? config.tools : undefined,
+      tool_choice: config.tools.length > 0 ? 'auto' : undefined
     });
 
-    const assistantResponse = completion.choices[0]?.message?.content?.trim() ||
-      '["Perdona, no t\'he entès bé.", "Pots repetir?"]';
+    const message = completion.choices[0]?.message;
+    const assistantResponse = message?.content?.trim() ||
+      'Perdona, no t\'he entès bé. Pots repetir?';
 
-    console.log('🤖 [DEBUG] GPT Response:', assistantResponse);
-
-    // Try to parse as JSON array
-    let messagesArray: string[];
-    try {
-      messagesArray = JSON.parse(assistantResponse);
-      if (!Array.isArray(messagesArray)) {
-        // If not array, wrap single message
-        messagesArray = [assistantResponse];
-      }
-    } catch {
-      // If JSON parse fails, split by newlines or use as single message
-      messagesArray = assistantResponse.includes('\n')
-        ? assistantResponse.split('\n').filter(m => m.trim())
-        : [assistantResponse];
+    console.log(`🤖 [${config.name}] GPT Response:`, assistantResponse);
+    
+    // Check if tools were used
+    const toolCalls = message?.tool_calls || [];
+    if (toolCalls.length > 0) {
+      console.log(`🛠️  [${config.name}] Tools called:`, toolCalls.map(t => t.function.name));
     }
 
-    // ENFORCE: Remove emojis from questions (any message ending with ?)
-    const emojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu;
-    messagesArray = messagesArray.map(msg => {
-      if (msg.includes('?')) {
-        // This is a question - REMOVE ALL EMOJIS
-        return msg.replace(emojiRegex, '').trim();
+    // Parse response into messages array
+    let messagesArray: string[] = [assistantResponse];
+    if (config.name === 'Current') {
+      // Current config expects JSON array format
+      try {
+        messagesArray = JSON.parse(assistantResponse);
+        if (!Array.isArray(messagesArray)) {
+          messagesArray = [assistantResponse];
+        }
+      } catch {
+        messagesArray = assistantResponse.includes('\n')
+          ? assistantResponse.split('\n').filter(m => m.trim())
+          : [assistantResponse];
       }
-      return msg;
-    });
 
-    // Extract any new data from the user's message using a separate call
-    const extractedData = await extractDataFromMessage(
-      userMessage,
-      context.collectedData
-    );
+      // ENFORCE: Remove emojis from questions (any message ending with ?)
+      const emojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu;
+      messagesArray = messagesArray.map(msg => {
+        if (msg.includes('?')) {
+          return msg.replace(emojiRegex, '').trim();
+        }
+        return msg;
+      });
+    }
+
+    // Process tool calls and extract data
+    let extractedData: Record<string, any> = {};
+    let readyToSend = false;
+    let shouldClose = false;
+    const toolsUsed: string[] = [];
+
+    if (toolCalls.length > 0) {
+      // Handle tool calls from Pep config
+      for (const toolCall of toolCalls) {
+        const toolName = toolCall.function.name;
+        const args = JSON.parse(toolCall.function.arguments);
+        toolsUsed.push(toolName);
+
+        console.log(`🛠️  [${config.name}] ${toolName}:`, args);
+
+        switch (toolName) {
+          case 'extract_tattoo_info':
+            // Merge extracted tattoo info
+            extractedData = { ...extractedData, ...args };
+            break;
+          
+          case 'answer_studio_question':
+            // Just log - answer is in the response text
+            console.log(`📍 [${config.name}] Answered ${args.question_category} question`);
+            break;
+          
+          case 'ready_to_send':
+            // User is ready to send to studio
+            readyToSend = args.confirmed === true;
+            break;
+          
+          case 'close_conversation':
+            // Conversation should close gracefully
+            shouldClose = true;
+            break;
+        }
+      }
+    } else if (config.name === 'Current') {
+      // Current config uses separate extraction call
+      extractedData = await extractDataFromMessage(
+        userMessage,
+        context.collectedData
+      );
+    }
 
     // DEBUG: Log what was extracted
     console.log('🔍 [DEBUG] User message:', userMessage);
     console.log('🔍 [DEBUG] Previously collected:', JSON.stringify(context.collectedData, null, 2));
     console.log('🔍 [DEBUG] Newly extracted:', JSON.stringify(extractedData, null, 2));
 
-    // Merge extracted data
+    // Merge extracted data with existing
     const updatedData = {
       ...context.collectedData,
       ...extractedData
@@ -144,14 +203,22 @@ export async function getConversationalResponse(
 
     console.log('🔍 [DEBUG] Updated data:', JSON.stringify(updatedData, null, 2));
 
-    // Completion: ready to estimate when description AND (style OR color)
+    // Determine if conversation is complete
+    // For Current: description AND (style OR color)
+    // For Pep: readyToSend flag from tool
     const hasStyleOrColor = Boolean(updatedData.style) || Boolean(updatedData.color);
-    const isComplete = Boolean(updatedData.description) && hasStyleOrColor;
+    const hasMinimumInfo = Boolean(updatedData.description || updatedData.placement);
+    const isComplete = config.name === 'Pep' 
+      ? (readyToSend && hasMinimumInfo)
+      : (Boolean(updatedData.description) && hasStyleOrColor);
 
     return {
       messages: messagesArray,
       extractedData: updatedData,
-      isComplete
+      isComplete,
+      toolsUsed,
+      readyToSend,
+      shouldClose
     };
   } catch (error) {
     console.error('Error in conversational AI:', error);

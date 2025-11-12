@@ -4,6 +4,8 @@ import { detectExitIntent, detectMedicalQuestion, detectComplexRequest, detectGr
 import { sendLeadToWebhook } from './webhookService';
 import { calculatePriceRange, formatPriceRange, hasEnoughDataForEstimate } from './priceEstimationService';
 import { getConversationalResponse, ConversationContext } from './conversationalAiService';
+import { ACTIVE_CONFIG } from '../config/botConfigs';
+import { logConversationMetrics, detectFrustration, detectLoops, countUserQuestions } from './metricsService';
 
 export interface BotResponse {
   messages: string[]; // Array of messages to send sequentially
@@ -249,18 +251,15 @@ async function processConversationalMessage(
     conversationHistory: []
   };
 
-  // Get AI response
-  const aiResponse = await getConversationalResponse(userMessage, context);
+  // Get AI response using active config
+  const aiResponse = await getConversationalResponse(userMessage, context, ACTIVE_CONFIG);
 
-  // Safety net: suppress redundant placement/size questions if placement already covered
-  const placementCovered =
-    Boolean(context.collectedData?.placement_size) ||
-    Boolean(context.collectedData?.placement_concept) ||
-    Boolean(context.collectedData?.description);
-  const placementPromptRegex = /(mida|ubicació|on\s+.*cos|placement_size)/i;
-  const filteredMessages = placementCovered
-    ? aiResponse.messages.filter(m => !placementPromptRegex.test(m))
-    : aiResponse.messages;
+  console.log(`🤖 [${ACTIVE_CONFIG.name}] Response:`, {
+    isComplete: aiResponse.isComplete,
+    readyToSend: aiResponse.readyToSend,
+    shouldClose: aiResponse.shouldClose,
+    toolsUsed: aiResponse.toolsUsed
+  });
 
   // Update conversation with new data
   await prisma.conversation.update({
@@ -270,6 +269,72 @@ async function processConversationalMessage(
       currentStep: (conversation.currentStep || 0) + 1
     }
   });
+
+  // Handle Pep-specific flows
+  if (ACTIVE_CONFIG.name === 'Pep') {
+    // Pep: If bot says conversation should close, close it gracefully
+    if (aiResponse.shouldClose) {
+      await prisma.conversation.update({
+        where: { id: conversationId },
+        data: { status: 'closed' }
+      });
+      
+      // Log metrics
+      logConversationMetrics({
+        conversationId,
+        botConfig: ACTIVE_CONFIG.name,
+        outcome: conversation.status as any,
+        messageCount: (conversation.currentStep || 0) + 1,
+        questionsAsked: 0, // TODO: track from messages
+        loopsDetected: 0,
+        frustrationDetected: false,
+        toolsUsed: aiResponse.toolsUsed || [],
+        timestamp: new Date()
+      });
+      
+      return { messages: aiResponse.messages, delay: 800 };
+    }
+
+    // Pep: If ready to send, send to studio and mark qualified
+    if (aiResponse.readyToSend && aiResponse.isComplete) {
+      await prisma.conversation.update({
+        where: { id: conversationId },
+        data: { status: 'qualified' }
+      });
+
+      // Send lead to webhook
+      await sendQualifiedLead(conversationId, studioId, aiResponse.extractedData, conversation.userPhone);
+
+      // Log metrics
+      logConversationMetrics({
+        conversationId,
+        botConfig: ACTIVE_CONFIG.name,
+        outcome: 'qualified',
+        messageCount: (conversation.currentStep || 0) + 1,
+        questionsAsked: 0,
+        loopsDetected: 0,
+        frustrationDetected: false,
+        toolsUsed: aiResponse.toolsUsed || [],
+        timestamp: new Date()
+      });
+
+      return { messages: aiResponse.messages, delay: 800 };
+    }
+
+    // Pep: Continue natural conversation
+    return { messages: aiResponse.messages, delay: 800 };
+  }
+
+  // Current config: Original flow with confirmation
+  // Safety net: suppress redundant placement/size questions if placement already covered
+  const placementCovered =
+    Boolean(context.collectedData?.placement_size) ||
+    Boolean(context.collectedData?.placement_concept) ||
+    Boolean(context.collectedData?.description);
+  const placementPromptRegex = /(mida|ubicació|on\s+.*cos|placement_size)/i;
+  const filteredMessages = placementCovered
+    ? aiResponse.messages.filter(m => !placementPromptRegex.test(m))
+    : aiResponse.messages;
 
   // If conversation is complete, send recap and ask for confirmation
   if (aiResponse.isComplete && !aiResponse.extractedData.name) {
