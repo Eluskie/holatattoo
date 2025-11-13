@@ -91,3 +91,27 @@ model Conversation {
   @@index([leadStatus])
   @@map("conversations")
 }
+
+model TestTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  
+  // Conversation data
+  messages    Json     @default("[]") // Array of {role: 'user'|'bot', content: string, timestamp: string}
+  finalData   Json     @default("{}") // Collected data at end
+  finalStatus String   @default("active") // 'qualified', 'closed', 'active', etc.
+  
+  // Metadata
+  messageCount Int      @default(0)
+  leadSent     Boolean  @default(false)
+  
+  // Events tracking
+  events      Json     @default("[]") // Array of {type, tool, timestamp, data}
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  @@map("test_templates")
+}

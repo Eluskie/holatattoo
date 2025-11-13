@@ -67,6 +67,33 @@ export async function POST(req: NextRequest) {
     const messages = conversationAny?.messages;
     const messageCount = Array.isArray(messages) ? messages.length : 0;
 
+    // Extract recent events from toolsUsed in bot response
+    // This will track what tools were called (extract, send, update, close)
+    const recentEvents: Array<{type: string; tool?: string; timestamp: string}> = [];
+    
+    // Add event based on what just happened
+    if (botResponse && conversation) {
+      // Check if lead was just sent
+      if (conversation.leadSentAt && 
+          new Date(conversation.leadSentAt).getTime() > Date.now() - 5000) {
+        recentEvents.push({
+          type: 'send',
+          tool: 'send_to_studio',
+          timestamp: new Date(conversation.leadSentAt).toISOString()
+        });
+      }
+      
+      // Check if conversation was just closed
+      if (conversation.closedAt && 
+          new Date(conversation.closedAt).getTime() > Date.now() - 5000) {
+        recentEvents.push({
+          type: 'close',
+          tool: 'close_conversation',
+          timestamp: new Date(conversation.closedAt).toISOString()
+        });
+      }
+    }
+
     return NextResponse.json({
       success: true,
       conversationId: conversation?.id,
@@ -74,9 +101,14 @@ export async function POST(req: NextRequest) {
       debug: {
         extractedData: conversation?.collectedData || {},
         status: conversation?.status,
+        leadStatus: conversation?.leadStatus || 'pending',
+        leadSent: Boolean(conversation?.leadSentAt),
+        leadSentAt: conversation?.leadSentAt,
+        closedAt: conversation?.closedAt,
         currentStep: conversation?.currentStep,
         conversationId: conversation?.id,
-        messageCount
+        messageCount,
+        recentEvents  // NEW: Track recent events
       }
     });
   } catch (error: any) {

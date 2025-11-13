@@ -12,17 +12,31 @@ interface Message {
 interface DebugInfo {
   extractedData: any;
   status: string;
+  leadStatus?: string;
+  leadSent?: boolean;
+  leadSentAt?: string;
+  closedAt?: string;
   currentStep: number;
   conversationId: string;
   messageCount: number;
+  recentEvents?: Array<{
+    type: string;
+    tool?: string;
+    timestamp: string;
+  }>;
 }
 
 interface Template {
   id: string;
   name: string;
-  description: string;
-  messages: string[];
-  expectedOutcome: any;
+  description?: string;
+  messages: any[];  // Can be string[] or Message[]
+  finalData?: any;
+  finalStatus?: string;
+  messageCount?: number;
+  leadSent?: boolean;
+  events?: any[];
+  createdAt?: string;
 }
 
 export default function BotTestPage() {
@@ -37,6 +51,10 @@ export default function BotTestPage() {
   const [showDebug, setShowDebug] = useState(true);
   const [evaluationMode, setEvaluationMode] = useState(false);
   const [evalStartTime, setEvalStartTime] = useState<number | null>(null);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const [saveDescription, setSaveDescription] = useState('');
+  const [showAllTemplates, setShowAllTemplates] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Load templates on mount
@@ -206,6 +224,78 @@ export default function BotTestPage() {
     }
   };
 
+  const saveCurrentConversation = async () => {
+    if (!saveName.trim()) {
+      alert('Please enter a template name');
+      return;
+    }
+
+    if (messages.length === 0) {
+      alert('No conversation to save');
+      return;
+    }
+
+    try {
+      const templateData = {
+        name: saveName.trim(),
+        description: saveDescription.trim() || null,
+        messages: messages.map(m => ({
+          role: m.role,
+          content: m.content,
+          timestamp: m.timestamp.toISOString()
+        })),
+        finalData: debugInfo?.extractedData || {},
+        finalStatus: debugInfo?.status || 'active',
+        messageCount: messages.length,
+        leadSent: debugInfo?.leadSent || false,
+        events: debugInfo?.recentEvents || []
+      };
+
+      const res = await fetch('/api/bot-test/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(templateData)
+      });
+
+      if (res.ok) {
+        alert('✅ Template saved successfully!');
+        setShowSaveModal(false);
+        setSaveName('');
+        setSaveDescription('');
+        fetchTemplates(); // Refresh list
+      } else {
+        const error = await res.json();
+        alert(`Error saving template: ${error.error}`);
+      }
+    } catch (error: any) {
+      console.error('Error saving template:', error);
+      alert(`Error: ${error.message}`);
+    }
+  };
+
+  const deleteTemplate = async (templateId: string) => {
+    if (!confirm('Delete this template?')) return;
+
+    try {
+      const res = await fetch(`/api/bot-test/templates?id=${templateId}`, {
+        method: 'DELETE'
+      });
+
+      if (res.ok) {
+        alert('✅ Template deleted');
+        fetchTemplates();
+      } else {
+        const error = await res.json();
+        alert(`Error: ${error.error}`);
+      }
+    } catch (error: any) {
+      console.error('Error deleting template:', error);
+      alert(`Error: ${error.message}`);
+    }
+  };
+
+  const displayedTemplates = showAllTemplates ? templates : templates.slice(0, 4);
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-7xl mx-auto">
@@ -218,6 +308,14 @@ export default function BotTestPage() {
               size="sm"
             >
               {showDebug ? 'Hide' : 'Show'} Debug
+            </Button>
+            <Button
+              onClick={() => setShowSaveModal(true)}
+              variant="outline"
+              size="sm"
+              disabled={messages.length === 0}
+            >
+              💾 Save as Template
             </Button>
             <Button
               onClick={resetConversation}
@@ -312,17 +410,25 @@ export default function BotTestPage() {
           <div className="space-y-4">
             {/* Templates */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <h3 className="font-semibold text-sm mb-3">📝 Test Templates</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-sm">📝 Test Templates ({templates.length})</h3>
+              </div>
               <div className="space-y-2">
-                {templates.map((template) => (
+                {displayedTemplates.map((template) => (
                   <div key={template.id} className="border border-gray-200 rounded p-2">
                     <div className="flex items-start justify-between mb-1">
                       <div className="flex-1">
                         <p className="text-xs font-medium">{template.name}</p>
-                        <p className="text-xs text-gray-500">{template.description}</p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {template.messages.length} messages
-                        </p>
+                        {template.description && (
+                          <p className="text-xs text-gray-500">{template.description}</p>
+                        )}
+                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
+                          <span>{template.messageCount || template.messages?.length || 0} msgs</span>
+                          {template.leadSent && <span className="text-green-600">✅ qualified</span>}
+                          {template.createdAt && (
+                            <span>{new Date(template.createdAt).toLocaleDateString()}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex gap-1 mt-2">
@@ -334,13 +440,38 @@ export default function BotTestPage() {
                         disabled={runningTemplate || loading}
                         size="sm"
                         variant="outline"
-                        className="w-full text-xs"
+                        className="flex-1 text-xs"
                       >
                         ▶️ Run
+                      </Button>
+                      <Button
+                        onClick={() => deleteTemplate(template.id)}
+                        size="sm"
+                        variant="outline"
+                        className="text-xs text-red-600 hover:bg-red-50"
+                      >
+                        🗑️
                       </Button>
                     </div>
                   </div>
                 ))}
+                
+                {templates.length === 0 && (
+                  <p className="text-xs text-gray-400 text-center py-4">
+                    No templates yet. Save a conversation to create one!
+                  </p>
+                )}
+                
+                {templates.length > 4 && (
+                  <Button
+                    onClick={() => setShowAllTemplates(!showAllTemplates)}
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs mt-2"
+                  >
+                    {showAllTemplates ? '▲ Show less' : `▼ Show ${templates.length - 4} more`}
+                  </Button>
+                )}
               </div>
 
               {evaluationMode && (
@@ -360,6 +491,43 @@ export default function BotTestPage() {
                 <h3 className="font-semibold text-sm mb-3">🔍 Debug Info</h3>
                 <div className="space-y-2 text-xs">
                   <div>
+                    <p className="text-gray-500">Status:</p>
+                    <p className="font-semibold">{debugInfo.status}</p>
+                    {debugInfo.leadSent && (
+                      <p className="text-green-600 text-xs mt-1">
+                        ✅ Lead Sent {debugInfo.leadSentAt ? `(${new Date(debugInfo.leadSentAt).toLocaleTimeString()})` : ''}
+                      </p>
+                    )}
+                    {debugInfo.closedAt && (
+                      <p className="text-gray-600 text-xs mt-1">
+                        🚪 Closed {new Date(debugInfo.closedAt).toLocaleTimeString()}
+                      </p>
+                    )}
+                  </div>
+                  
+                  {debugInfo.recentEvents && debugInfo.recentEvents.length > 0 && (
+                    <div className="pt-2 border-t">
+                      <p className="text-gray-500">Recent Events:</p>
+                      <div className="space-y-1 mt-1">
+                        {debugInfo.recentEvents.map((event, idx) => (
+                          <div key={idx} className="text-xs bg-gray-50 p-1.5 rounded">
+                            <span className="font-mono">
+                              {event.type === 'send' && '📤'}
+                              {event.type === 'close' && '🚪'}
+                              {event.type === 'update' && '🔄'}
+                              {' '}
+                              {event.tool || event.type}
+                            </span>
+                            <span className="text-gray-400 ml-2">
+                              {new Date(event.timestamp).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="pt-2 border-t">
                     <p className="text-gray-500">Extracted Data:</p>
                     <pre className="bg-gray-50 p-2 rounded mt-1 overflow-x-auto text-xs">
                       {JSON.stringify(debugInfo.extractedData, null, 2)}
@@ -379,6 +547,71 @@ export default function BotTestPage() {
           </div>
         </div>
       </div>
+
+      {/* Save Template Modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowSaveModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold mb-4">💾 Save as Template</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Template Name *
+                </label>
+                <input
+                  type="text"
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  placeholder="e.g., Happy Path - Full Qualification"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description (optional)
+                </label>
+                <textarea
+                  value={saveDescription}
+                  onChange={(e) => setSaveDescription(e.target.value)}
+                  placeholder="Brief description of this test scenario..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                <p>📊 This template will include:</p>
+                <ul className="mt-1 space-y-0.5 ml-4">
+                  <li>• {messages.length} messages</li>
+                  <li>• Extracted data: {JSON.stringify(debugInfo?.extractedData || {}).length} chars</li>
+                  <li>• Status: {debugInfo?.status}</li>
+                  {debugInfo?.leadSent && <li>• ✅ Lead sent</li>}
+                </ul>
+              </div>
+            </div>
+            
+            <div className="flex gap-2 mt-6">
+              <Button
+                onClick={() => setShowSaveModal(false)}
+                variant="outline"
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={saveCurrentConversation}
+                disabled={!saveName.trim()}
+                className="flex-1"
+              >
+                💾 Save
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
