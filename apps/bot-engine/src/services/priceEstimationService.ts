@@ -103,3 +103,12 @@ export function formatPriceRange(priceRange: PriceRange): string {
 export function hasEnoughDataForEstimate(data: CollectedData): boolean {
   return !!(data.style && data.placement_size);
 }
+
+/**
+ * Estimate price with minimal interface (returns only min/max)
+ * Used for passing to bot system prompt
+ */
+export function estimatePrice(data: CollectedData): { min: number; max: number } {
+  const priceRange = calculatePriceRange(data);
+  return { min: priceRange.min, max: priceRange.max };
+}

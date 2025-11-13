@@ -1,11 +1,12 @@
-import { prisma } from '@hola-tattoo/database';
+import { prisma, Prisma } from '@hola-tattoo/database';
 import { TwilioIncomingMessage, QualifiedLead } from '@hola-tattoo/shared-types';
 import { detectExitIntent, detectMedicalQuestion, detectComplexRequest, detectGratitudeIntent } from './aiService';
 import { sendLeadToWebhook } from './webhookService';
-import { calculatePriceRange, formatPriceRange, hasEnoughDataForEstimate } from './priceEstimationService';
+import { calculatePriceRange, formatPriceRange, hasEnoughDataForEstimate, estimatePrice } from './priceEstimationService';
 import { getConversationalResponse, ConversationContext } from './conversationalAiService';
 import { ACTIVE_CONFIG } from '../config/botConfigs';
 import { logConversationMetrics, detectFrustration, detectLoops, countUserQuestions } from './metricsService';
+import { detectSignificantChange, detectConfirmationIntent, detectRejectionIntent, hasMinimumLeadInfo } from './leadHelpers';
 
 export interface BotResponse {
   messages: string[]; // Array of messages to send sequentially
@@ -240,9 +241,14 @@ async function processConversationalMessage(
     return { messages: ["Perdona, hi ha hagut un error.", "Torna a començar si us plau."], delay: 800 };
   }
 
-  // Check if conversation is pending confirmation
+  // Check if conversation is pending confirmation (Current config)
   if (conversation.status === 'pending_confirmation') {
     return await handleConfirmation(conversation, userMessage, studioId);
+  }
+
+  // Check if conversation is pending update confirmation (Pep config)
+  if (conversation.status === 'pending_update_confirmation') {
+    return await handleUpdateConfirmation(conversation, userMessage, studioId);
   }
 
   // Build conversation context with recent message history
@@ -293,44 +299,24 @@ async function processConversationalMessage(
 
   // Handle Pep-specific flows
   if (ACTIVE_CONFIG.name === 'Pep') {
-    // Pep: If bot says conversation should close, close it gracefully
+    const updatedData = aiResponse.extractedData;
+    const leadAlreadySent = Boolean(conversation.leadSentAt);
+
+    // 1. CLOSE CONVERSATION
     if (aiResponse.shouldClose) {
       await prisma.conversation.update({
         where: { id: conversationId },
-        data: { status: 'closed' }
+        data: {
+          status: 'closed',
+          closedAt: new Date(),
+          closeReason: aiResponse.closeReason || 'user_ended'
+        }
       });
-      
-      // Log metrics
+
       logConversationMetrics({
         conversationId,
         botConfig: ACTIVE_CONFIG.name,
-        outcome: conversation.status as any,
-        messageCount: (conversation.currentStep || 0) + 1,
-        questionsAsked: 0, // TODO: track from messages
-        loopsDetected: 0,
-        frustrationDetected: false,
-        toolsUsed: aiResponse.toolsUsed || [],
-        timestamp: new Date()
-      });
-      
-      return { messages: aiResponse.messages, delay: 800 };
-    }
-
-    // Pep: If ready to send, send to studio and mark qualified
-    if (aiResponse.readyToSend && aiResponse.isComplete) {
-      await prisma.conversation.update({
-        where: { id: conversationId },
-        data: { status: 'qualified' }
-      });
-
-      // Send lead to webhook
-      await sendQualifiedLead(conversationId, studioId, aiResponse.extractedData, conversation.userPhone);
-
-      // Log metrics
-      logConversationMetrics({
-        conversationId,
-        botConfig: ACTIVE_CONFIG.name,
-        outcome: 'qualified',
+        outcome: conversation.leadSentAt ? 'qualified' : 'dropped',
         messageCount: (conversation.currentStep || 0) + 1,
         questionsAsked: 0,
         loopsDetected: 0,
@@ -342,7 +328,90 @@ async function processConversationalMessage(
       return { messages: aiResponse.messages, delay: 800 };
     }
 
-    // Pep: Continue natural conversation
+    // 2. SEND TO STUDIO (first time)
+    if (aiResponse.readyToSend && !leadAlreadySent) {
+      const hasMinimum = hasMinimumLeadInfo(updatedData);
+
+      if (hasMinimum) {
+        // Calculate price estimate
+        const priceEstimate = hasEnoughDataForEstimate(updatedData)
+          ? estimatePrice(updatedData)
+          : { min: 80, max: 300 }; // Generic range
+
+        // Send lead to webhook
+        await sendQualifiedLead(conversationId, studioId, updatedData, conversation.userPhone);
+
+        // Update conversation
+        await prisma.conversation.update({
+          where: { id: conversationId },
+          data: {
+            leadStatus: 'sent',
+            leadSentAt: new Date(),
+            status: 'active', // Keep active for further questions!
+            collectedData: updatedData
+          }
+        });
+
+        // Generate response with price if GPT didn't include it
+        let responseMessages = aiResponse.messages;
+        const hasPrice = responseMessages.some(msg => msg.includes('€') || msg.includes('euro'));
+        const hasFollowUp = responseMessages.some(msg => msg.toLowerCase().includes('alguna cosa més'));
+
+        if (!hasPrice && priceEstimate) {
+          const priceText = `Aquest tipus de tattoo sol anar entre ${priceEstimate.min}-${priceEstimate.max}€. L'artista t'ho confirmarà tot.`;
+          responseMessages = [responseMessages[0], priceText, ...responseMessages.slice(1)];
+        }
+
+        if (!hasFollowUp) {
+          responseMessages.push("Alguna cosa més?");
+        }
+
+        console.log(`📤 [SEND] Lead sent for conversation ${conversationId}. Status: active (conversa continua)`);
+
+        return { messages: responseMessages, delay: 800 };
+      }
+    }
+
+    // 3. UPDATE LEAD (after already sent)
+    if (aiResponse.shouldUpdate && leadAlreadySent) {
+      const oldData = (conversation.collectedData as Record<string, any>) || {};
+      const changeAnalysis = detectSignificantChange(oldData, updatedData);
+
+      if (aiResponse.requiresConfirmation || changeAnalysis.significant) {
+        // Significant change → Ask for confirmation
+        await prisma.conversation.update({
+          where: { id: conversationId },
+          data: {
+            status: 'pending_update_confirmation',
+            pendingUpdate: updatedData
+          }
+        });
+
+        console.log(`⏳ [UPDATE] Waiting for confirmation. Changes: ${aiResponse.updateChanges || changeAnalysis.changes.join(', ')}`);
+
+        // GPT should have generated confirmation message
+        return { messages: aiResponse.messages, delay: 800 };
+
+      } else {
+        // Minor change → Auto-update
+        await sendQualifiedLead(conversationId, studioId, updatedData, conversation.userPhone);
+
+        await prisma.conversation.update({
+          where: { id: conversationId },
+          data: {
+            collectedData: updatedData,
+            lastUpdatedAt: new Date(),
+            leadStatus: 'updated'
+          }
+        });
+
+        console.log(`🔄 [UPDATE] Lead auto-updated. Changes: ${aiResponse.updateChanges}`);
+
+        return { messages: aiResponse.messages, delay: 800 };
+      }
+    }
+
+    // 4. CONTINUE CONVERSATION
     return { messages: aiResponse.messages, delay: 800 };
   }
 
@@ -477,6 +546,70 @@ async function handleConfirmation(
         ...aiResponse.messages,
         "Alguna cosa més a canviar?"
       ],
+      delay: 800
+    };
+  }
+}
+
+/**
+ * Handle update confirmation state
+ * User is confirming or rejecting an update to the lead
+ */
+async function handleUpdateConfirmation(
+  conversation: any,
+  userMessage: string,
+  studioId: string
+): Promise<BotResponse> {
+  const pendingData = (conversation.pendingUpdate as Record<string, any>) || {};
+  const oldData = (conversation.collectedData as Record<string, any>) || {};
+
+  // Check if user is confirming
+  const isConfirming = detectConfirmationIntent(userMessage);
+  const isRejecting = detectRejectionIntent(userMessage);
+
+  if (isConfirming) {
+    // User confirmed → Update lead
+    await sendQualifiedLead(conversation.id, studioId, pendingData, conversation.userPhone);
+
+      await prisma.conversation.update({
+        where: { id: conversation.id },
+        data: {
+          status: 'active',
+          collectedData: pendingData,
+          pendingUpdate: Prisma.DbNull,
+          lastUpdatedAt: new Date(),
+          leadStatus: 'updated'
+        }
+      });
+
+    console.log(`✅ [UPDATE-CONFIRMED] Lead updated for conversation ${conversation.id}`);
+
+    return {
+      messages: ["Fet! He actualitzat la info. Alguna cosa més?"],
+      delay: 800
+    };
+
+  } else if (isRejecting) {
+    // User rejected → Cancel update
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: {
+        status: 'active',
+        pendingUpdate: Prisma.DbNull
+      }
+    });
+
+    console.log(`❌ [UPDATE-REJECTED] Update cancelled for conversation ${conversation.id}`);
+
+    return {
+      messages: ["Cap problema! Deixem la info com estava. Alguna cosa més?"],
+      delay: 800
+    };
+
+  } else {
+    // Unclear response → Ask again
+    return {
+      messages: ["Perdona, no t'he entès. Vols que actualitzi la info? Respon 'sí' o 'no'."],
       delay: 800
     };
   }

@@ -68,8 +68,13 @@ export interface AIResponse {
   extractedData: Record<string, any>;
   isComplete: boolean;
   toolsUsed?: string[]; // Track which tools were called
-  readyToSend?: boolean; // Pep: user ready to send to studio
+  readyToSend?: boolean; // Pep: user ready to send to studio (send_to_studio tool)
+  shouldUpdate?: boolean; // Pep: lead needs updating (update_lead tool)
+  requiresConfirmation?: boolean; // Pep: update requires user confirmation
+  updateChanges?: string; // Summary of changes for update_lead
   shouldClose?: boolean; // Pep: conversation should close gracefully
+  closeReason?: string; // Reason for closing
+  priceEstimate?: { min: number; max: number }; // Price estimate if applicable
 }
 
 /**
@@ -118,16 +123,18 @@ export async function getConversationalResponse(
       // GPT called tools but didn't provide text - generate contextual response
       const toolNames = toolCalls.map(t => t.function.name);
       
-      if (toolNames.includes('ready_to_send')) {
-        assistantResponse = "Perfecte! Passo la informació a l'estudi. Et contactaran aviat! 👍";
+      if (toolNames.includes('send_to_studio')) {
+        // Will be generated with price estimate later
+        assistantResponse = "";
+      } else if (toolNames.includes('update_lead')) {
+        // GPT should provide confirmation text
+        assistantResponse = "Entesos!";
       } else if (toolNames.includes('close_conversation')) {
         assistantResponse = "De res! Fins aviat! 😊";
       } else if (toolNames.includes('extract_tattoo_info')) {
         // Smart response based on what we have and what's missing
         // We'll know what was extracted after processing tool calls
         assistantResponse = ""; // Will be set after processing
-      } else if (toolNames.includes('answer_studio_question')) {
-        assistantResponse = "D'acord!";
       } else {
         assistantResponse = "D'acord!";
       }
@@ -170,7 +177,11 @@ export async function getConversationalResponse(
     // Process tool calls and extract data
     let extractedData: Record<string, any> = {};
     let readyToSend = false;
+    let shouldUpdate = false;
+    let requiresConfirmation = false;
+    let updateChanges = '';
     let shouldClose = false;
+    let closeReason = '';
     const toolsUsed: string[] = [];
 
     if (toolCalls.length > 0) {
@@ -192,9 +203,9 @@ export async function getConversationalResponse(
               const isCurrentEmpty = !currentValue || currentValue === '' || currentValue === 'No especificat';
               
               // Update if: new value is non-empty AND (current is empty OR current is generic)
-              const shouldUpdate = !isValueEmpty && isCurrentEmpty;
+              const shouldUpdateField = !isValueEmpty && isCurrentEmpty;
               
-              if (shouldUpdate) {
+              if (shouldUpdateField) {
                 console.log(`  ✅ [EXTRACT] ${key}: "${currentValue || '(empty)'}" → "${value}"`);
                 extractedData[key] = value;
               } else if (!isValueEmpty && !isCurrentEmpty && currentValue !== value) {
@@ -204,19 +215,25 @@ export async function getConversationalResponse(
             }
             break;
           
-          case 'answer_studio_question':
-            // Just log - answer is in the response text
-            console.log(`📍 [${config.name}] Answered ${args.question_category} question`);
-            break;
-          
-          case 'ready_to_send':
+          case 'send_to_studio':
             // User is ready to send to studio
             readyToSend = args.confirmed === true;
+            console.log(`📤 [${config.name}] send_to_studio called (readyToSend=${readyToSend})`);
+            break;
+          
+          case 'update_lead':
+            // Lead needs updating
+            shouldUpdate = true;
+            requiresConfirmation = args.requiresConfirmation === true;
+            updateChanges = args.changes || '';
+            console.log(`🔄 [${config.name}] update_lead called (requiresConfirmation=${requiresConfirmation}, changes="${updateChanges}")`);
             break;
           
           case 'close_conversation':
             // Conversation should close gracefully
             shouldClose = true;
+            closeReason = args.reason || 'user_ended';
+            console.log(`🚪 [${config.name}] close_conversation called (reason="${closeReason}")`);
             break;
         }
       }
@@ -282,7 +299,11 @@ export async function getConversationalResponse(
       isComplete,
       toolsUsed,
       readyToSend,
-      shouldClose
+      shouldUpdate,
+      requiresConfirmation,
+      updateChanges,
+      shouldClose,
+      closeReason
     };
   } catch (error) {
     console.error('Error in conversational AI:', error);
