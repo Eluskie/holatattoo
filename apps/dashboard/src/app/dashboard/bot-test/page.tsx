@@ -167,7 +167,9 @@ export default function BotTestPage() {
     // Run messages sequentially with delay
     for (const msg of template.messages) {
       await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay between messages
-      await sendMessage(msg.content);
+      // Support both string format and object format
+      const messageContent = typeof msg === 'string' ? msg : msg.content;
+      await sendMessage(messageContent);
     }
 
     setRunningTemplate(false);
@@ -236,17 +238,22 @@ export default function BotTestPage() {
     }
 
     try {
-      const templateData = {
-        name: saveName.trim(),
-        description: saveDescription.trim() || null,
-        messages: messages.map(m => ({
+      // Filter only user messages for template replay
+      const userMessages = messages
+        .filter(m => m.role === 'user')
+        .map(m => ({
           role: m.role,
           content: m.content,
           timestamp: m.timestamp.toISOString()
-        })),
+        }));
+
+      const templateData = {
+        name: saveName.trim(),
+        description: saveDescription.trim() || null,
+        messages: userMessages,
         finalData: debugInfo?.extractedData || {},
         finalStatus: debugInfo?.status || 'active',
-        messageCount: messages.length,
+        messageCount: userMessages.length,
         leadSent: debugInfo?.leadSent || false,
         events: debugInfo?.recentEvents || []
       };
