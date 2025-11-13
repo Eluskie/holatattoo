@@ -167,7 +167,7 @@ export default function BotTestPage() {
     // Run messages sequentially with delay
     for (const msg of template.messages) {
       await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay between messages
-      await sendMessage(msg);
+      await sendMessage(msg.content);
     }
 
     setRunningTemplate(false);
