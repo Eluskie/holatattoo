@@ -8,7 +8,12 @@
 export interface BotConfig {
   name: string;
   description: string;
-  systemPrompt: string | ((collectedData: Record<string, any>, userMessage: string) => string);
+  systemPrompt: string | ((
+    collectedData: Record<string, any>, 
+    userMessage: string,
+    leadSent?: boolean,
+    priceEstimate?: { min: number; max: number }
+  ) => string);
   tools: any[];
   settings: {
     temperature: number;

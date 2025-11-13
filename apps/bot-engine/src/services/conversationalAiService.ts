@@ -61,6 +61,8 @@ const EXTRACT_TATTOO_INFO_FUNCTION = {
 export interface ConversationContext {
   collectedData: Record<string, any>;
   conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
+  leadSent?: boolean; // Whether lead has already been sent
+  priceEstimate?: { min: number; max: number }; // Price estimate for system prompt
 }
 
 export interface AIResponse {
@@ -92,7 +94,12 @@ export async function getConversationalResponse(
 
     // Build the system prompt with current state
     const systemPrompt = typeof config.systemPrompt === 'function'
-      ? config.systemPrompt(context.collectedData, userMessage)
+      ? config.systemPrompt(
+          context.collectedData, 
+          userMessage, 
+          context.leadSent || false,
+          context.priceEstimate
+        )
       : config.systemPrompt.replace('{{collectedData}}', JSON.stringify(context.collectedData))
                           .replace('{{userMessage}}', userMessage);
 

@@ -273,10 +273,23 @@ async function processConversationalMessage(
     console.log(`📜 [HISTORY] Using ${conversationHistory.length} recent messages for context`);
   }
 
+  // Check if lead already sent
+  const leadAlreadySent = Boolean(conversation.leadSentAt);
+  
+  // Calculate price estimate for system prompt
+  const collectedData = (conversation.collectedData as Record<string, any>) || {};
+  const priceEstimate = hasEnoughDataForEstimate(collectedData)
+    ? estimatePrice(collectedData)
+    : undefined;
+
   const context: ConversationContext = {
-    collectedData: (conversation.collectedData as Record<string, any>) || {},
-    conversationHistory
+    collectedData,
+    conversationHistory,
+    leadSent: leadAlreadySent,
+    priceEstimate
   };
+
+  console.log(`📊 [CONTEXT] leadSent=${leadAlreadySent}, priceEstimate=${priceEstimate ? `${priceEstimate.min}-${priceEstimate.max}€` : 'N/A'}`);
 
   // Get AI response using active config
   const aiResponse = await getConversationalResponse(userMessage, context, ACTIVE_CONFIG);
@@ -300,7 +313,6 @@ async function processConversationalMessage(
   // Handle Pep-specific flows
   if (ACTIVE_CONFIG.name === 'Pep') {
     const updatedData = aiResponse.extractedData;
-    const leadAlreadySent = Boolean(conversation.leadSentAt);
 
     // 1. CLOSE CONVERSATION
     if (aiResponse.shouldClose) {
