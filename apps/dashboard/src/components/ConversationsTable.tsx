@@ -36,7 +36,7 @@ export function ConversationsTable({ conversations }: Props) {
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200">
       <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900">Recent Conversations</h2>
+        <h2 className="text-lg font-semibold text-gray-900">Conversations</h2>
       </div>
 
       {/* Mobile Card Layout */}

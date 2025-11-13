@@ -1,5 +1,5 @@
 import { prisma } from '@hola-tattoo/database'
-import { ConversationsTable } from '@/components/ConversationsTable'
+import { ConversationsWithPagination } from '@/components/ConversationsWithPagination'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -36,10 +36,6 @@ export default async function DashboardPage() {
       where: { userId: user.id },
       include: {
         botConfig: true,
-        conversations: {
-          orderBy: { createdAt: 'desc' },
-          take: 10,
-        },
       },
     })
 
@@ -108,7 +104,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* Recent Conversations */}
-        <ConversationsTable conversations={studio.conversations} />
+        <ConversationsWithPagination />
       </div>
     )
   } catch (error: any) {
