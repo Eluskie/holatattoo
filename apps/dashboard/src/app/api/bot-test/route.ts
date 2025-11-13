@@ -81,8 +81,13 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error in bot test:', error);
+    console.error('Error stack:', error.stack);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { 
+        error: error.message || 'Internal server error',
+        details: error.stack,
+        type: error.constructor.name
+      },
       { status: 500 }
     );
   }

@@ -100,11 +100,13 @@ export default function BotTestPage() {
         setConversationId(data.conversationId);
         setDebugInfo(data.debug);
       } else {
-        alert(`Error: ${data.error}`);
+        const errorMsg = `Error: ${data.error}\n\nType: ${data.type || 'Unknown'}\n\nDetails:\n${data.details || 'No details'}`;
+        console.error('API Error:', data);
+        alert(errorMsg);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending message:', error);
-      alert('Error sending message');
+      alert(`Error sending message: ${error.message}`);
     } finally {
       setLoading(false);
     }
