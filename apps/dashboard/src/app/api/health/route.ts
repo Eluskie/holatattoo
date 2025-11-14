@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@hola-tattoo/database'
+import { DASHBOARD_VERSION, getVersionString } from '../../../version'
 
 export async function GET() {
   try {
@@ -11,6 +12,12 @@ export async function GET() {
     
     return NextResponse.json({ 
       status: 'healthy',
+      version: {
+        number: DASHBOARD_VERSION.version,
+        name: DASHBOARD_VERSION.name,
+        releaseDate: DASHBOARD_VERSION.releaseDate,
+        full: getVersionString()
+      },
       database: 'connected',
       tables: 'exist',
       userCount,

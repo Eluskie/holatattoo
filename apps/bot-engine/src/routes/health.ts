@@ -1,5 +1,7 @@
 import express from 'express';
 import { prisma } from '@hola-tattoo/database';
+import { BOT_VERSION, getVersionString } from '../version';
+import { ACTIVE_CONFIG } from '../config/botConfigs';
 
 export const healthRouter = express.Router();
 
@@ -11,6 +13,13 @@ healthRouter.get('/', async (req, res) => {
     res.json({
       status: 'healthy',
       timestamp: new Date().toISOString(),
+      version: {
+        number: BOT_VERSION.version,
+        name: BOT_VERSION.name,
+        releaseDate: BOT_VERSION.releaseDate,
+        config: ACTIVE_CONFIG.name,
+        full: getVersionString()
+      },
       services: {
         database: 'connected',
         api: 'running'

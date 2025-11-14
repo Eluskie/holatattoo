@@ -4,8 +4,12 @@ import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import { twilioRouter } from './routes/twilio';
 import { healthRouter } from './routes/health';
+import { logVersion } from './version';
 
 dotenv.config();
+
+// Log version on startup
+logVersion();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
