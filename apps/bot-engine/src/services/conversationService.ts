@@ -353,14 +353,16 @@ async function processConversationalMessage(
         // Send lead to webhook
         await sendQualifiedLead(conversationId, studioId, updatedData, conversation.userPhone);
 
-        // Update conversation
+        // Update conversation with price estimate
         await prisma.conversation.update({
           where: { id: conversationId },
           data: {
             leadStatus: 'sent',
             leadSentAt: new Date(),
             status: 'active', // Keep active for further questions!
-            collectedData: updatedData
+            collectedData: updatedData,
+            estimatedPriceMin: priceEstimate.min,
+            estimatedPriceMax: priceEstimate.max
           }
         });
 
@@ -408,12 +410,19 @@ async function processConversationalMessage(
         // Minor change → Auto-update
         await sendQualifiedLead(conversationId, studioId, updatedData, conversation.userPhone);
 
+        // Recalculate price estimate with updated data
+        const priceEstimate = hasEnoughDataForEstimate(updatedData)
+          ? estimatePrice(updatedData)
+          : { min: 80, max: 300 };
+
         await prisma.conversation.update({
           where: { id: conversationId },
           data: {
             collectedData: updatedData,
             lastUpdatedAt: new Date(),
-            leadStatus: 'updated'
+            leadStatus: 'updated',
+            estimatedPriceMin: priceEstimate.min,
+            estimatedPriceMax: priceEstimate.max
           }
         });
 
@@ -497,10 +506,19 @@ async function handleConfirmation(
   const isConfirming = detectConfirmation(userMessage) || detectFinishIntent(userMessage);
 
   if (isConfirming) {
+    // Calculate price estimate before marking as qualified
+    const priceEstimate = hasEnoughDataForEstimate(data)
+      ? estimatePrice(data)
+      : { min: 80, max: 300 };
+
     // User confirmed! Submit lead and mark as qualified
     await prisma.conversation.update({
       where: { id: conversation.id },
-      data: { status: 'qualified' }
+      data: { 
+        status: 'qualified',
+        estimatedPriceMin: priceEstimate.min,
+        estimatedPriceMax: priceEstimate.max
+      }
     });
 
     // Build final recap with price estimate and send webhook
@@ -583,6 +601,11 @@ async function handleUpdateConfirmation(
     // User confirmed → Update lead
     await sendQualifiedLead(conversation.id, studioId, pendingData, conversation.userPhone);
 
+      // Recalculate price estimate with confirmed data
+      const priceEstimate = hasEnoughDataForEstimate(pendingData)
+        ? estimatePrice(pendingData)
+        : { min: 80, max: 300 };
+
       await prisma.conversation.update({
         where: { id: conversation.id },
         data: {
@@ -590,7 +613,9 @@ async function handleUpdateConfirmation(
           collectedData: pendingData,
           pendingUpdate: Prisma.DbNull,
           lastUpdatedAt: new Date(),
-          leadStatus: 'updated'
+          leadStatus: 'updated',
+          estimatedPriceMin: priceEstimate.min,
+          estimatedPriceMax: priceEstimate.max
         }
       });
 

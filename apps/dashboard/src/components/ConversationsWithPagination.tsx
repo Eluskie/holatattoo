@@ -20,6 +20,8 @@ interface Conversation {
   collectedData: any
   createdAt: Date
   messages?: any[]
+  estimatedPriceMin?: number | null
+  estimatedPriceMax?: number | null
 }
 
 interface PaginationInfo {

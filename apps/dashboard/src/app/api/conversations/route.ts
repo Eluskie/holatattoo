@@ -39,6 +39,20 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
       skip,
       take: limit,
+      select: {
+        id: true,
+        userPhone: true,
+        status: true,
+        currentStep: true,
+        collectedData: true,
+        messages: true,
+        leadStatus: true,
+        leadSentAt: true,
+        estimatedPriceMin: true,
+        estimatedPriceMax: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     })
 
     const totalPages = Math.ceil(totalCount / limit)

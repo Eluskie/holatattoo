@@ -75,6 +75,10 @@ model Conversation {
   leadSentAt    DateTime? @map("lead_sent_at")
   lastUpdatedAt DateTime? @map("last_updated_at")
   
+  // Price estimation
+  estimatedPriceMin Int?     @map("estimated_price_min") // Minimum estimated price in euros
+  estimatedPriceMax Int?     @map("estimated_price_max") // Maximum estimated price in euros
+  
   // Conversation closure
   closedAt      DateTime? @map("closed_at")
   closeReason   String?   @map("close_reason")
