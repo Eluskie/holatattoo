@@ -3,6 +3,12 @@
  * Replaces Twilio for direct WhatsApp messaging via Meta's Graph API
  */
 
+interface WhatsAppMessageResponse {
+  messages?: Array<{
+    id: string;
+  }>;
+}
+
 const WHATSAPP_API_URL = 'https://graph.facebook.com/v22.0/870562186141111/messages';
 let accessToken: string;
 let phoneNumberId: string;
@@ -92,7 +98,7 @@ export async function sendWhatsAppMessage(
       throw new Error(`WhatsApp API error: ${JSON.stringify(error)}`);
     }
 
-    const result = await response.json();
+    const result = await response.json() as WhatsAppMessageResponse;
     console.log(`✅ Sent message to ${to} (delay: ${delay}ms)${buttons ? ' with buttons' : ''}`);
     console.log(`📱 Message ID: ${result.messages?.[0]?.id}`);
 
