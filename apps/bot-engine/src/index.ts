@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
-import { twilioRouter } from './routes/twilio';
+import { whatsappRouter } from './routes/whatsapp';
 import { healthRouter } from './routes/health';
 import { logVersion } from './version';
 
@@ -21,7 +21,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Routes
 app.use('/health', healthRouter);
-app.use('/webhook/twilio', twilioRouter);
+app.use('/webhook/whatsapp', whatsappRouter);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -33,7 +33,8 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 if (process.env.VERCEL !== '1') {
   app.listen(PORT, () => {
     console.log(`🚀 Bot Engine running on port ${PORT}`);
-    console.log(`📱 Twilio webhook: http://localhost:${PORT}/webhook/twilio/whatsapp`);
+    console.log(`📱 WhatsApp webhook: http://localhost:${PORT}/webhook/whatsapp`);
+    console.log(`🔗 Meta webhook URL: https://your-domain.com/webhook/whatsapp`);
   });
 }
 
