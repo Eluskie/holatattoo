@@ -1,6 +1,6 @@
 # Production Dockerfile for Hola Tattoo Bot Engine (Monorepo)
 # Use Debian slim for better Prisma compatibility
-FROM node:20-slim AS base
+FROM node:20.18.1-slim AS base
 
 # Install OpenSSL and other dependencies for Prisma
 RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
